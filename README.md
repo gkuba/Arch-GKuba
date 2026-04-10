@@ -1,16 +1,11 @@
-# Debian-Gkuba
+# Arch-Gkuba
 
-This is my customization for fresh Debian installs.
+This is my customization for fresh Arch based installs.
 
-## Download Debian non-free netinstall
+## Download Arch live or CachyOS
+- [Arch Download][Arch ISO]
 
-Use the following Debian ISO as the base:
-
-- [Debian 11.5 Stable non-free][Debian ISO]
-
-[Debian ISO]: https://cdimage.debian.org/cdimage/unofficial/non-free/cd-including-firmware/11.5.0+nonfree/amd64/iso-cd/
-
-__NOTE:__ _do NOT grab the EDU download. This image includes non-free and firmware_
+[Arch ISO]:https://archlinux.org/download/
 
 ### To Install
 This must be run as the `root` user.
