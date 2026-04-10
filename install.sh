@@ -34,7 +34,7 @@ fi
 #   exit 1
 # fi
 
-function checkUpdtes 
+function checkUpdates 
 {
   echo
   echo -e "${YELLOW}Checking for and installing updates...${ENDCOLOR}"
