@@ -75,8 +75,6 @@ fi
 ## ENTRY POINT
 ##############
 
-echo
-echo
 echo -e "----------------------------"
 echo -e "    ${BLUE}Installation Summary${ENDCOLOR}    "
 echo -e "----------------------------"
