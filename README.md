@@ -11,7 +11,7 @@ This is my customization for fresh Arch based installs.
 This must be run as the `root` user.
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Debian-Gkuba/main/install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/install.sh)
 ```
 
 #### Install script information
@@ -22,7 +22,7 @@ Full list of these functions below just append the one you want at the end of th
 This example will check for updates:
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Debian-Gkuba/main/install.sh) checkUpdates
+bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/install.sh) checkUpdates
 ```
 
 ##### Functions
