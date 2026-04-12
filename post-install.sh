@@ -5,19 +5,20 @@
 
 set -euo pipefail
 
-# ── Colors ─────────────────────────────────────────────────────────────────────
+# ── Colors (defined first to prevent unbound variable errors) ─────────────────
 RED="\e[31m"
 GREEN="\e[32m"
 YELLOW="\e[33m"
 BLUE="\e[34m"
 MAGENTA="\e[35m"
 CYAN="\e[36m"
-RESET="\e[0m"
+ENDCOLOR="\e[0m"
 
-info()    { echo -e "${BLUE}[INFO]${RESET} $*"; }
-success() { echo -e "${GREEN}[OK]${RESET} $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${RESET} $*"; }
-error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+# Functions using colors
+info()    { echo -e "${BLUE}[INFO]${ENDCOLOR} $*"; }
+success() { echo -e "${GREEN}[OK]${ENDCOLOR} $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${ENDCOLOR} $*"; }
+error()   { echo -e "${RED}[ERROR]${ENDCOLOR} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
