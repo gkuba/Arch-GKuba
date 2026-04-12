@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Arch-based Post-Install Script
+# =============================================================================
+
+set -euo pipefail
+
+# ── Colors ─────────────────────────────────────────────────────────────────────
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+MAGENTA="\e[35m"
+CYAN="\e[36m"
+ENDCOLOR="\e[0m"
+
+info()    { echo -e "${BLUE}[INFO]${ENDCOLOR} $*"; }
+success() { echo -e "${GREEN}[OK]${ENDCOLOR} $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${ENDCOLOR} $*"; }
+error()   { echo -e "${RED}[ERROR]${ENDCOLOR} $*" >&2; }
+
+# ── Configuration ──────────────────────────────────────────────────────────────
+CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
+EXTRA_PACKAGES="discord code ghostty"
+
+# ── Help ───────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [FUNCTION...]
+
+Available functions:
+  checkUpdates     Update system packages
+  installPackages  Install wanted packages
+
+If no arguments are given, the script runs interactively.
+EOF
+    exit 0
+}
+
+# ── Check if running as root ───────────────────────────────────────────────────
+if [[ $EUID -ne 0 ]]; then
+    error "This script must be run as root. Please use 'sudo su' first."
+    exit 1
+fi
+
+# ── Check if running on Arch-based system ──────────────────────────────────────
+check_arch_based() {
+    if [[ ! -f /etc/os-release ]]; then
+        error "Cannot detect OS. This script is for Arch-based systems only."
+        exit 1
+    fi
+
+    source /etc/os-release
+
+    if [[ "$ID" != "arch" && "$ID_LIKE" != *"arch"* ]]; then
+        error "This script is designed for Arch-based distributions only."
+        error "Detected: ${PRETTY_NAME:-Unknown}"
+        exit 1
+    fi
+
+    info "Detected Arch-based system: ${PRETTY_NAME}"
+}
+
+# ── Functions ──────────────────────────────────────────────────────────────────
+
+checkUpdates() {
+    info "Checking for and installing system updates..."
+    pacman -Syu --noconfirm
+    success "System updated"
+}
+
+installPackages() {
+    local packages="$1"
+    info "Installing packages..."
+    echo -e "${YELLOW}Packages: ${packages}${ENDCOLOR}"
+    echo
+
+    pacman -S --noconfirm $packages
+    success "Packages installed successfully"
+}
+
+# ── Interactive Mode ───────────────────────────────────────────────────────────
+interactive_mode() {
+    echo -e "${CYAN}===================================================${ENDCOLOR}"
+    echo -e "          ${BLUE}Arch-based Post-Install Script${ENDCOLOR}"
+    echo -e "${CYAN}===================================================${ENDCOLOR}"
+    echo
+
+    # System Information
+    echo -e "${BLUE}System Information:${ENDCOLOR}"
+    echo -e "  Hostname:      ${GREEN}$(hostname)${ENDCOLOR}"
+    echo -e "  OS:            ${GREEN}$(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)${ENDCOLOR}"
+    echo
+
+    # Core packages
+    echo -e "${BLUE}Core Packages to install:${ENDCOLOR}"
+    echo "  ${CORE_PACKAGES}"
+    echo
+
+    # Extra packages
+    echo -e "${BLUE}Extra Packages (optional):${ENDCOLOR}"
+    echo "  ${EXTRA_PACKAGES}"
+    echo
+
+    read -r -p "Install extra packages (discord, code, ghostty)? (y/N): " install_extra
+
+    if [[ "$install_extra" =~ ^[Yy]$ ]]; then
+        PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
+        echo -e "${GREEN}→ Will install core + extra packages${ENDCOLOR}"
+    else
+        PACKAGES_TO_INSTALL="$CORE_PACKAGES"
+        echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
+    fi
+
+    echo
+    echo -e "${YELLOW}Ready to proceed with the following:${RESET}"
+    echo "   • System update"
+    echo "   • Install: $PACKAGES_TO_INSTALL"
+    echo
+
+    read -r -p "Press [Enter] to continue or Ctrl+C to cancel... "
+
+    checkUpdates
+    installPackages "$PACKAGES_TO_INSTALL"
+
+    echo
+    success "Post-installation completed successfully!"
+}
+
+# ── Main Logic ─────────────────────────────────────────────────────────────────
+
+if [[ $# -gt 0 ]]; then
+    # Run specific functions if arguments are passed
+    for arg in "$@"; do
+        if declare -f "$arg" >/dev/null; then
+            "$arg"
+        else
+            error "No such function: $arg"
+            usage
+        fi
+    done
+else
+    # Default: Interactive mode
+    interactive_mode
+fi
+
+exit 0
