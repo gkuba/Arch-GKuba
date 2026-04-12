@@ -21,7 +21,7 @@ error()   { echo -e "${RED}[ERROR]${ENDCOLOR} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord code ghostty"
+EXTRA_PACKAGES="discord code ghostty vivaldi"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -102,7 +102,7 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    read -r -p "Install extra packages (discord, code, ghostty)? (y/N): " install_extra
+    read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
@@ -130,7 +130,6 @@ interactive_mode() {
 # ── Main Logic ─────────────────────────────────────────────────────────────────
 
 if [[ $# -gt 0 ]]; then
-    # Run specific functions if arguments are passed
     for arg in "$@"; do
         if declare -f "$arg" >/dev/null; then
             "$arg"
