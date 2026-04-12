@@ -87,23 +87,21 @@ interactive_mode() {
     echo -e "${CYAN}===================================================${ENDCOLOR}"
     echo
 
-    # System Information
     echo -e "${BLUE}System Information:${ENDCOLOR}"
     echo -e "  Hostname:      ${GREEN}$(hostname)${ENDCOLOR}"
     echo -e "  OS:            ${GREEN}$(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)${ENDCOLOR}"
     echo
 
-    # Core packages
     echo -e "${BLUE}Core Packages:${ENDCOLOR}"
     echo "  ${CORE_PACKAGES}"
     echo
 
-    # Extra packages prompt
     echo -e "${BLUE}Extra Packages (optional):${ENDCOLOR}"
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra
+    # Force interactive input even when piped
+    read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra < /dev/tty
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
@@ -116,17 +114,16 @@ interactive_mode() {
     echo
     echo -e "${YELLOW}Ready to proceed with the following:${RESET}"
     echo "   • System update"
-    echo "   • Install packages: $PACKAGES_TO_INSTALL"
+    echo "   • Install: $PACKAGES_TO_INSTALL"
     echo
 
-    read -r -p "Press [Enter] to continue or type Q / Ctrl+C to quit: " confirm
+    read -r -p "Press [Enter] to continue or type Q to quit: " confirm < /dev/tty
 
     if [[ "$confirm" =~ ^[Qq]$ ]]; then
         echo "Setup cancelled by user."
         exit 0
     fi
 
-    # Run the actual steps
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
 
