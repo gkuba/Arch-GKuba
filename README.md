@@ -1,48 +1,70 @@
-# Arch-Gkuba
+# Arch-Gkuba Post-Install
 
-This is my customization for fresh Arch based installs.
+This is my personal post-install script for fresh Arch Linux and CachyOS installations.
 
-## Download Arch live or CachyOS
-- [Arch Download][Arch ISO]
+It handles system updates and installs a curated set of essential and extra packages.
 
-[Arch ISO]:https://archlinux.org/download/
+---
 
-### To Install
-This must be run as the `root` user.
+## Requirements
 
-```bash
-bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/install.sh)
-```
+- Must be run as root (sudo su first)
+- Arch-based system (Arch Linux, CachyOS, EndeavourOS, etc.)
 
-#### Install script information
+---
 
-The `install.sh` script has been written in a modular way. This allows you to run parts of this or the whole thing.
-Full list of these functions below just append the one you want at the end of the command listed.
+## Quick Install (Full Setup)
 
-This example will check for updates:
+Run the following command as root:
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/install.sh) checkUpdates
+curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash
 ```
 
-##### Functions
+---
 
-- Check for package updates
+## Modular Usage
 
-```text
-checkUpdates
+The script supports running specific parts only.
+
+### Available Functions
+
+Function          | Description
+------------------|--------------------------------------------------
+checkUpdates      | Update the system (pacman -Syu)
+installPackages   | Install the core + extra packages
+
+### Examples
+
+```bash
+# Run full setup (default)
+curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash
+
+# Only update the system
+curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash -s checkUpdates
+
+# Only install packages
+curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash -s installPackages
 ```
+---
 
-- Install Wanted Packages
+## Packages Installed
 
-```text
-installPackages
-```
+Core Packages:
+- git curl unzip neovim fastfetch fzf
 
-This will install the packages listed under the `$WANTED_PACKAGES` variable
+Extra Packages (optional - you will be prompted):
+- discord code ghostty vivaldi
 
-###### Misc Info
+---
 
-My bash prompt and settings can be found here [gkuba/dotfiles][gkuba/dotfiles]
+## My Dotfiles
 
-[gkuba/dotfiles]: https://github.com/gkuba/dotfiles
+My full dotfiles (.zshrc, Starship config, Neovim config, etc.) can be found here:
+
+→ https://github.com/gkuba/dotfiles
+
+---
+
+Note:
+After running this post-install script, I recommend running my separate setup-dotfiles.sh script to pull in my complete configuration.
