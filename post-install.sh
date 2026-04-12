@@ -12,12 +12,12 @@ YELLOW="\e[33m"
 BLUE="\e[34m"
 MAGENTA="\e[35m"
 CYAN="\e[36m"
-ENDCOLOR="\e[0m"
+RESET="\e[0m"
 
-info()    { echo -e "${BLUE}[INFO]${ENDCOLOR} $*"; }
-success() { echo -e "${GREEN}[OK]${ENDCOLOR} $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${ENDCOLOR} $*"; }
-error()   { echo -e "${RED}[ERROR]${ENDCOLOR} $*" >&2; }
+info()    { echo -e "${BLUE}[INFO]${RESET} $*"; }
+success() { echo -e "${GREEN}[OK]${RESET} $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET} $*"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
