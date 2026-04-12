@@ -22,7 +22,7 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord code ghostty vivaldi"
+EXTRA_PACKAGES="discord code ghostty vivaldi obsidian"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
