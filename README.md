@@ -18,7 +18,7 @@ It handles system updates and installs a curated set of essential and extra pack
 Run the following command as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh)
 ```
 
 ---
@@ -38,13 +38,13 @@ installPackages   | Install the core + extra packages
 
 ```bash
 # Run full setup (default)
-curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh)
 
 # Only update the system
-curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash -s checkUpdates
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) checkUpdates
 
 # Only install packages
-curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh | bash -s installPackages
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) installPackages
 ```
 ---
 
