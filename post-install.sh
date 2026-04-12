@@ -5,17 +5,16 @@
 
 set -euo pipefail
 
-# ── Colors (All defined at the top to prevent unbound variable errors) ────────
+# ── Colors (All defined at the top) ───────────────────────────────────────────
 RED="\e[31m"
 GREEN="\e[32m"
 YELLOW="\e[33m"
 BLUE="\e[34m"
 MAGENTA="\e[35m"
 CYAN="\e[36m"
-RESET="\e[0m"
 ENDCOLOR="\e[0m"
+RESET="\e[0m"
 
-# Functions using colors
 info()    { echo -e "${BLUE}[INFO]${RESET} $*"; }
 success() { echo -e "${GREEN}[OK]${RESET} $*"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $*"; }
@@ -95,11 +94,11 @@ interactive_mode() {
     echo
 
     # Core packages
-    echo -e "${BLUE}Core Packages to install:${ENDCOLOR}"
+    echo -e "${BLUE}Core Packages:${ENDCOLOR}"
     echo "  ${CORE_PACKAGES}"
     echo
 
-    # Extra packages
+    # Extra packages prompt
     echo -e "${BLUE}Extra Packages (optional):${ENDCOLOR}"
     echo "  ${EXTRA_PACKAGES}"
     echo
@@ -117,11 +116,17 @@ interactive_mode() {
     echo
     echo -e "${YELLOW}Ready to proceed with the following:${RESET}"
     echo "   • System update"
-    echo "   • Install: $PACKAGES_TO_INSTALL"
+    echo "   • Install packages: $PACKAGES_TO_INSTALL"
     echo
 
-    read -r -p "Press [Enter] to continue or Ctrl+C to cancel... "
+    read -r -p "Press [Enter] to continue or type Q / Ctrl+C to quit: " confirm
 
+    if [[ "$confirm" =~ ^[Qq]$ ]]; then
+        echo "Setup cancelled by user."
+        exit 0
+    fi
+
+    # Run the actual steps
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
 
