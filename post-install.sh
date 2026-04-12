@@ -80,7 +80,7 @@ installPackages() {
     success "Packages installed successfully"
 }
 
-# ── Interactive Mode ───────────────────────────────────────────────────────────
+# ── Interactive Mode (works with curl | bash) ──────────────────────────────────
 interactive_mode() {
     echo -e "${CYAN}===================================================${ENDCOLOR}"
     echo -e "          ${BLUE}Arch-based Post-Install Script${ENDCOLOR}"
@@ -100,7 +100,7 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    # Force interactive input even when piped
+    # Force read from terminal even when piped
     read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra < /dev/tty
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
@@ -134,6 +134,7 @@ interactive_mode() {
 # ── Main Logic ─────────────────────────────────────────────────────────────────
 
 if [[ $# -gt 0 ]]; then
+    # Run specific functions if arguments are passed
     for arg in "$@"; do
         if declare -f "$arg" >/dev/null; then
             "$arg"
