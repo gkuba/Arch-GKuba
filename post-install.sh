@@ -22,7 +22,7 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord code ghostty vivaldi obsidian"
+EXTRA_PACKAGES="discord code ghostty vivaldi"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -32,6 +32,7 @@ Usage: $(basename "$0") [FUNCTION...]
 Available functions:
   checkUpdates     Update system packages
   installPackages  Install wanted packages
+  dnsStubFix       Disable systemd-resolved stub and configure DNS
 
 If no arguments are given, the script runs interactively.
 EOF
@@ -80,7 +81,47 @@ installPackages() {
     success "Packages installed successfully"
 }
 
-# ── Interactive Mode (works with curl | bash) ──────────────────────────────────
+dnsStubFix() {
+    echo
+    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_fix < /dev/tty
+
+    if [[ ! "$do_fix" =~ ^[Yy]$ ]]; then
+        echo "DNS Stub Fix skipped."
+        return 0
+    fi
+
+    echo
+    read -r -p "Primary nameserver (e.g. 10.13.37.2): " primary_dns < /dev/tty
+    read -r -p "Secondary nameserver (leave blank for none): " secondary_dns < /dev/tty
+    read -r -p "Search domain (e.g. pixelville.games, leave blank for none): " search_domain < /dev/tty
+
+    # Default primary to Cloudflare if nothing provided
+    if [[ -z "$primary_dns" ]]; then
+        primary_dns="1.1.1.1"
+    fi
+
+    info "Configuring DNS with primary: $primary_dns"
+
+    # Stop and disable systemd-resolved
+    sudo systemctl stop systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket 2>/dev/null || true
+    sudo systemctl disable systemd-resolved.service 2>/dev/null || true
+
+    # Build resolv.conf content
+    {
+        echo "nameserver $primary_dns"
+        [[ -n "$secondary_dns" ]] && echo "nameserver $secondary_dns"
+        [[ -n "$search_domain" ]] && echo "search $search_domain"
+        echo "options edns0"
+    } | sudo tee /etc/resolv.conf >/dev/null
+
+    # Make it immutable
+    sudo chattr +i /etc/resolv.conf
+
+    success "DNS configured successfully. Stub resolver disabled."
+    echo -e "${CYAN}→ resolv.conf is now immutable. Use 'sudo chattr -i /etc/resolv.conf' to edit later.${RESET}"
+}
+
+# ── Interactive Mode ───────────────────────────────────────────────────────────
 interactive_mode() {
     echo -e "${CYAN}===================================================${ENDCOLOR}"
     echo -e "          ${BLUE}Arch-based Post-Install Script${ENDCOLOR}"
@@ -100,7 +141,6 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    # Force read from terminal even when piped
     read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra < /dev/tty
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
@@ -109,6 +149,14 @@ interactive_mode() {
     else
         PACKAGES_TO_INSTALL="$CORE_PACKAGES"
         echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
+    fi
+
+    # DNS Stub Fix Prompt
+    echo
+    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_dns_fix < /dev/tty
+
+    if [[ "$do_dns_fix" =~ ^[Yy]$ ]]; then
+        dnsStubFix
     fi
 
     echo
@@ -134,7 +182,6 @@ interactive_mode() {
 # ── Main Logic ─────────────────────────────────────────────────────────────────
 
 if [[ $# -gt 0 ]]; then
-    # Run specific functions if arguments are passed
     for arg in "$@"; do
         if declare -f "$arg" >/dev/null; then
             "$arg"
