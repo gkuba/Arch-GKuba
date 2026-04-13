@@ -45,6 +45,9 @@ bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-i
 
 # Only install packages
 bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) installPackages
+
+# Only dnsStubFix
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) dnsStubFix
 ```
 ---
 
