@@ -22,7 +22,8 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord code ghostty vivaldi"
+EXTRA_PACKAGES="discord code ghostty vivaldi coolercontrol coolercontrold"
+EXTRA_AUR_PACKAGES="visual-studio-code-bin"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -63,6 +64,22 @@ check_arch_based() {
     info "Detected Arch-based system: ${PRETTY_NAME}"
 }
 
+# ── Install paru only if not already installed ────────────────────────────────
+install_paru_if_needed() {
+    if ! command -v paru >/dev/null 2>&1; then
+        info "paru (AUR helper) is not installed. Installing now..."
+        sudo pacman -S --noconfirm --needed base-devel git
+        git clone https://aur.archlinux.org/paru.git /tmp/paru
+        cd /tmp/paru
+        makepkg -si --noconfirm
+        cd -
+        rm -rf /tmp/paru
+        success "paru installed successfully"
+    else
+        info "paru is already installed."
+    fi
+}
+
 # ── Functions ──────────────────────────────────────────────────────────────────
 
 checkUpdates() {
@@ -95,18 +112,15 @@ dnsStubFix() {
     read -r -p "Secondary nameserver (leave blank for none): " secondary_dns < /dev/tty
     read -r -p "Search domain (e.g. pixelville.games, leave blank for none): " search_domain < /dev/tty
 
-    # Default primary to Cloudflare if nothing provided
     if [[ -z "$primary_dns" ]]; then
         primary_dns="1.1.1.1"
     fi
 
     info "Configuring DNS with primary: $primary_dns"
 
-    # Stop and disable systemd-resolved
     sudo systemctl stop systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket 2>/dev/null || true
     sudo systemctl disable systemd-resolved.service 2>/dev/null || true
 
-    # Build resolv.conf content
     {
         echo "nameserver $primary_dns"
         [[ -n "$secondary_dns" ]] && echo "nameserver $secondary_dns"
@@ -114,7 +128,6 @@ dnsStubFix() {
         echo "options edns0"
     } | sudo tee /etc/resolv.conf >/dev/null
 
-    # Make it immutable
     sudo chattr +i /etc/resolv.conf
 
     success "DNS configured successfully. Stub resolver disabled."
@@ -141,22 +154,21 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
+    echo -e "${BLUE}Extra AUR Packages (optional):${ENDCOLOR}"
+    echo "  ${EXTRA_AUR_PACKAGES}"
+    echo
+
     read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra < /dev/tty
+    read -r -p "Install extra AUR packages (visual-studio-code-bin)? (y/N): " install_aur_extra < /dev/tty
+
+    PACKAGES_TO_INSTALL="$CORE_PACKAGES"
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
-        echo -e "${GREEN}→ Will install core + extra packages${ENDCOLOR}"
-    else
-        PACKAGES_TO_INSTALL="$CORE_PACKAGES"
-        echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_PACKAGES"
     fi
 
-    # DNS Stub Fix Prompt
-    echo
-    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_dns_fix < /dev/tty
-
-    if [[ "$do_dns_fix" =~ ^[Yy]$ ]]; then
-        dnsStubFix
+    if [[ "$install_aur_extra" =~ ^[Yy]$ ]]; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_AUR_PACKAGES"
     fi
 
     echo
@@ -174,6 +186,14 @@ interactive_mode() {
 
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
+
+    # Install paru only if needed for AUR packages
+    if [[ "$install_aur_extra" =~ ^[Yy]$ ]]; then
+        install_paru_if_needed
+        info "Installing AUR package: visual-studio-code-bin"
+        paru -S --noconfirm visual-studio-code-bin
+        success "visual-studio-code-bin installed"
+    fi
 
     echo
     success "Post-installation completed successfully!"
