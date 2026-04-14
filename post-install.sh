@@ -22,8 +22,13 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord ghostty obsidian vivaldi coolercontrol coolercontrold spotify-launcher"
-EXTRA_AUR_PACKAGES="visual-studio-code-bin"
+
+# Extra packages (without vscode)
+EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher"
+
+# Separate prompts
+VSCODE_PACKAGE="visual-studio-code-bin"
+COOLING_PACKAGES="coolercontrol coolercontrold"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -64,22 +69,6 @@ check_arch_based() {
     info "Detected Arch-based system: ${PRETTY_NAME}"
 }
 
-# ── Install paru only if not already installed ────────────────────────────────
-install_paru_if_needed() {
-    if ! command -v paru >/dev/null 2>&1; then
-        info "paru (AUR helper) is not installed. Installing now..."
-        sudo pacman -S --noconfirm --needed base-devel git
-        git clone https://aur.archlinux.org/paru.git /tmp/paru
-        cd /tmp/paru
-        makepkg -si --noconfirm
-        cd -
-        rm -rf /tmp/paru
-        success "paru installed successfully"
-    else
-        info "paru is already installed."
-    fi
-}
-
 # ── Functions ──────────────────────────────────────────────────────────────────
 
 checkUpdates() {
@@ -91,10 +80,15 @@ checkUpdates() {
 installPackages() {
     local packages="$1"
     info "Installing packages..."
+
+    # Sync AUR and official repos first (important for AUR packages)
+    info "Syncing package databases..."
+    paru -Sy
+
     echo -e "${YELLOW}Packages: ${packages}${ENDCOLOR}"
     echo
 
-    pacman -S --noconfirm $packages
+    paru -S --noconfirm $packages
     success "Packages installed successfully"
 }
 
@@ -131,7 +125,6 @@ dnsStubFix() {
     sudo chattr +i /etc/resolv.conf
 
     success "DNS configured successfully. Stub resolver disabled."
-    echo -e "${CYAN}→ resolv.conf is now immutable. Use 'sudo chattr -i /etc/resolv.conf' to edit later.${RESET}"
 }
 
 # ── Interactive Mode ───────────────────────────────────────────────────────────
@@ -154,21 +147,40 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    echo -e "${BLUE}Extra AUR Packages (optional):${ENDCOLOR}"
-    echo "  ${EXTRA_AUR_PACKAGES}"
-    echo
-
-    read -r -p "Install extra packages (discord, code, ghostty, vivaldi)? (y/N): " install_extra < /dev/tty
-    read -r -p "Install extra AUR packages (visual-studio-code-bin)? (y/N): " install_aur_extra < /dev/tty
-
-    PACKAGES_TO_INSTALL="$CORE_PACKAGES"
+    read -r -p "Install extra packages (discord, ghostty, obsidian, vivaldi, spotify-launcher)? (y/N): " install_extra < /dev/tty
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_PACKAGES"
+        PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
+        echo -e "${GREEN}→ Will install core + extra packages${ENDCOLOR}"
+    else
+        PACKAGES_TO_INSTALL="$CORE_PACKAGES"
+        echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
     fi
 
-    if [[ "$install_aur_extra" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_AUR_PACKAGES"
+    # VS Code prompt
+    echo
+    read -r -p "Install Visual Studio Code (visual-studio-code-bin)? (y/N): " install_vscode < /dev/tty
+
+    if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $VSCODE_PACKAGE"
+        echo -e "${GREEN}→ Will also install Visual Studio Code${ENDCOLOR}"
+    fi
+
+    # Cooling packages prompt
+    echo
+    read -r -p "Install cooling packages (coolercontrol + coolercontrold)? (y/N): " install_cooling < /dev/tty
+
+    if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $COOLING_PACKAGES"
+        echo -e "${GREEN}→ Will also install cooling packages${ENDCOLOR}"
+    fi
+
+    # DNS Stub Fix Prompt
+    echo
+    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_dns_fix < /dev/tty
+
+    if [[ "$do_dns_fix" =~ ^[Yy]$ ]]; then
+        dnsStubFix
     fi
 
     echo
@@ -186,14 +198,6 @@ interactive_mode() {
 
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
-
-    # Install paru only if needed for AUR packages
-    if [[ "$install_aur_extra" =~ ^[Yy]$ ]]; then
-        install_paru_if_needed
-        info "Installing AUR package: visual-studio-code-bin"
-        paru -S --noconfirm visual-studio-code-bin
-        success "visual-studio-code-bin installed"
-    fi
 
     echo
     success "Post-installation completed successfully!"
