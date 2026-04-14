@@ -22,7 +22,7 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
-EXTRA_PACKAGES="discord code ghostty vivaldi coolercontrol coolercontrold"
+EXTRA_PACKAGES="discord code ghostty vivaldi coolercontrol coolercontrold spotify-launcher"
 EXTRA_AUR_PACKAGES="visual-studio-code-bin"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
