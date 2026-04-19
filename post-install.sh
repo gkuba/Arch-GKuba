@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Arch-based Post-Install Script
+# Arch-based Post-Install Script - GKuba Edition
 # =============================================================================
 
 set -euo pipefail
@@ -23,8 +23,8 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
 
-# Extra packages (without vscode)
-EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher"
+# Extra packages
+EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
 
 # Separate prompts
 VSCODE_PACKAGE="visual-studio-code-bin"
@@ -38,7 +38,6 @@ Usage: $(basename "$0") [FUNCTION...]
 Available functions:
   checkUpdates     Update system packages
   installPackages  Install wanted packages
-  dnsStubFix       Disable systemd-resolved stub and configure DNS
 
 If no arguments are given, the script runs interactively.
 EOF
@@ -92,41 +91,6 @@ installPackages() {
     success "Packages installed successfully"
 }
 
-dnsStubFix() {
-    echo
-    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_fix < /dev/tty
-
-    if [[ ! "$do_fix" =~ ^[Yy]$ ]]; then
-        echo "DNS Stub Fix skipped."
-        return 0
-    fi
-
-    echo
-    read -r -p "Primary nameserver (e.g. 10.13.37.2): " primary_dns < /dev/tty
-    read -r -p "Secondary nameserver (leave blank for none): " secondary_dns < /dev/tty
-    read -r -p "Search domain (e.g. pixelville.games, leave blank for none): " search_domain < /dev/tty
-
-    if [[ -z "$primary_dns" ]]; then
-        primary_dns="1.1.1.1"
-    fi
-
-    info "Configuring DNS with primary: $primary_dns"
-
-    sudo systemctl stop systemd-resolved.service systemd-resolved-monitor.socket systemd-resolved-varlink.socket 2>/dev/null || true
-    sudo systemctl disable systemd-resolved.service 2>/dev/null || true
-
-    {
-        echo "nameserver $primary_dns"
-        [[ -n "$secondary_dns" ]] && echo "nameserver $secondary_dns"
-        [[ -n "$search_domain" ]] && echo "search $search_domain"
-        echo "options edns0"
-    } | sudo tee /etc/resolv.conf >/dev/null
-
-    sudo chattr +i /etc/resolv.conf
-
-    success "DNS configured successfully. Stub resolver disabled."
-}
-
 # ── Interactive Mode ───────────────────────────────────────────────────────────
 interactive_mode() {
     echo -e "${CYAN}===================================================${ENDCOLOR}"
@@ -147,7 +111,7 @@ interactive_mode() {
     echo "  ${EXTRA_PACKAGES}"
     echo
 
-    read -r -p "Install extra packages (discord, ghostty, obsidian, vivaldi, spotify-launcher)? (y/N): " install_extra < /dev/tty
+    read -r -p "Install extra packages? (y/N): " install_extra < /dev/tty
 
     if [[ "$install_extra" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
@@ -160,7 +124,6 @@ interactive_mode() {
     # VS Code prompt
     echo
     read -r -p "Install Visual Studio Code (visual-studio-code-bin)? (y/N): " install_vscode < /dev/tty
-
     if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $VSCODE_PACKAGE"
         echo -e "${GREEN}→ Will also install Visual Studio Code${ENDCOLOR}"
@@ -169,18 +132,9 @@ interactive_mode() {
     # Cooling packages prompt
     echo
     read -r -p "Install cooling packages (coolercontrol + coolercontrold)? (y/N): " install_cooling < /dev/tty
-
     if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $COOLING_PACKAGES"
         echo -e "${GREEN}→ Will also install cooling packages${ENDCOLOR}"
-    fi
-
-    # DNS Stub Fix Prompt
-    echo
-    read -r -p "Do you want to disable systemd-resolved stub and configure custom DNS? (y/N): " do_dns_fix < /dev/tty
-
-    if [[ "$do_dns_fix" =~ ^[Yy]$ ]]; then
-        dnsStubFix
     fi
 
     echo
@@ -198,6 +152,14 @@ interactive_mode() {
 
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
+
+    # ── Post-install actions ─────────────────────────────────────────────────
+    if [[ "$PACKAGES_TO_INSTALL" == *coolercontrold* ]]; then
+        echo
+        info "Enabling and starting CoolerControl daemon..."
+        sudo systemctl enable --now coolercontrold
+        sudo systemctl status coolercontrold --no-pager
+    fi
 
     echo
     success "Post-installation completed successfully!"
