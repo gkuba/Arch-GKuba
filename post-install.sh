@@ -23,11 +23,13 @@ error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 # ── Configuration ──────────────────────────────────────────────────────────────
 CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
 
-# Extra packages
+# Extra packages (installed with pacman)
 EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
 
-# Separate prompts
-VSCODE_PACKAGE="visual-studio-code-bin"
+# AUR packages (installed with paru)
+AUR_PACKAGES="visual-studio-code-bin"
+
+# Cooling packages
 COOLING_PACKAGES="coolercontrol coolercontrold"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
@@ -45,8 +47,9 @@ EOF
 }
 
 # ── Check if running as root ───────────────────────────────────────────────────
-if [[ $EUID -ne 0 ]]; then
-    error "This script must be run as root. Please use 'sudo su' first."
+if [[ $EUID -eq 0 ]]; then
+    error "This script should NOT be run as root."
+    error "Please run it as your normal user. sudo will be used where needed."
     exit 1
 fi
 
@@ -72,23 +75,16 @@ check_arch_based() {
 
 checkUpdates() {
     info "Checking for and installing system updates..."
-    pacman -Syu --noconfirm
+    sudo pacman -Syu --noconfirm
     success "System updated"
 }
 
 installPackages() {
     local packages="$1"
-    info "Installing packages..."
+    info "Installing official packages with pacman..."
 
-    # Sync AUR and official repos first (important for AUR packages)
-    info "Syncing package databases..."
-    paru -Sy
-
-    echo -e "${YELLOW}Packages: ${packages}${ENDCOLOR}"
-    echo
-
-    paru -S --noconfirm $packages
-    success "Packages installed successfully"
+    sudo pacman -S --noconfirm $packages
+    success "Official packages installed successfully"
 }
 
 # ── Interactive Mode ───────────────────────────────────────────────────────────
@@ -121,13 +117,9 @@ interactive_mode() {
         echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
     fi
 
-    # VS Code prompt
+    # VS Code prompt (AUR package)
     echo
-    read -r -p "Install Visual Studio Code (visual-studio-code-bin)? (y/N): " install_vscode < /dev/tty
-    if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $VSCODE_PACKAGE"
-        echo -e "${GREEN}→ Will also install Visual Studio Code${ENDCOLOR}"
-    fi
+    read -r -p "Install Visual Studio Code (visual-studio-code-bin from AUR)? (y/N): " install_vscode < /dev/tty
 
     # Cooling packages prompt
     echo
@@ -141,6 +133,7 @@ interactive_mode() {
     echo -e "${YELLOW}Ready to proceed with the following:${RESET}"
     echo "   • System update"
     echo "   • Install: $PACKAGES_TO_INSTALL"
+    [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru)"
     echo
 
     read -r -p "Press [Enter] to continue or type Q to quit: " confirm < /dev/tty
@@ -152,6 +145,13 @@ interactive_mode() {
 
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
+
+    # Install VS Code with paru (AUR only)
+    if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
+        info "Installing Visual Studio Code from AUR..."
+        paru -S --noconfirm "$VSCODE_PACKAGE"
+        success "Visual Studio Code installed"
+    fi
 
     # ── Post-install actions ─────────────────────────────────────────────────
     if [[ "$PACKAGES_TO_INSTALL" == *coolercontrold* ]]; then
@@ -177,7 +177,6 @@ if [[ $# -gt 0 ]]; then
         fi
     done
 else
-    # Default: Interactive mode
     interactive_mode
 fi
 
