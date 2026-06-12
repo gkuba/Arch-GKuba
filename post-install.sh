@@ -5,15 +5,15 @@
 
 set -euo pipefail
 
-# ── Colors (All defined at the top) ───────────────────────────────────────────
-RED="\e[31m"
-GREEN="\e[32m"
-YELLOW="\e[33m"
-BLUE="\e[34m"
-MAGENTA="\e[35m"
-CYAN="\e[36m"
-ENDCOLOR="\e[0m"
-RESET="\e[0m"
+# ── Colors (Standardized with \033 for uniform cross-environment rendering) ───
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+CYAN="\033[36m"
+ENDCOLOR="\033[0m"
+RESET="\033[0m"
 
 info()    { echo -e "${BLUE}[INFO]${RESET} $*"; }
 success() { echo -e "${GREEN}[OK]${RESET} $*"; }
@@ -26,11 +26,11 @@ CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
 # Extra packages (installed with pacman)
 EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
 
-# AUR packages (installed with paru)
-AUR_PACKAGES="visual-studio-code-bin"
-
 # Cooling packages
 COOLING_PACKAGES="coolercontrol coolercontrold"
+
+# AUR package definition
+VSCODE_PACKAGE="visual-studio-code-bin"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -46,97 +46,81 @@ EOF
     exit 0
 }
 
-# ── Check if running as root ───────────────────────────────────────────────────
-if [[ $EUID -eq 0 ]]; then
-    error "This script should NOT be run as root."
-    error "Please run it as your normal user. sudo will be used where needed."
-    exit 1
-fi
-
-# ── Check if running on Arch-based system ──────────────────────────────────────
-check_arch_based() {
-    if [[ ! -f /etc/os-release ]]; then
-        error "Cannot detect OS. This script is for Arch-based systems only."
-        exit 1
-    fi
-
-    source /etc/os-release
-
-    if [[ "$ID" != "arch" && "$ID_LIKE" != *"arch"* ]]; then
-        error "This script is designed for Arch-based distributions only."
-        error "Detected: ${PRETTY_NAME:-Unknown}"
-        exit 1
-    fi
-
-    info "Detected Arch-based system: ${PRETTY_NAME}"
-}
-
-# ── Functions ──────────────────────────────────────────────────────────────────
+# ── Helper Functions ───────────────────────────────────────────────────────────
 
 checkUpdates() {
-    info "Checking for and installing system updates..."
+    info "Checking for system updates..."
     sudo pacman -Syu --noconfirm
-    success "System updated"
+    success "System updated successfully"
 }
 
 installPackages() {
-    local packages="$1"
-    info "Installing official packages with pacman..."
-
-    sudo pacman -S --noconfirm $packages
-    success "Official packages installed successfully"
+    local pkgs="$1"
+    if [[ -n "$pkgs" ]]; then
+        info "Installing packages: $pkgs"
+        sudo pacman -S --needed --noconfirm $pkgs
+        success "Packages installed successfully"
+    else
+        warn "No packages specified for installation"
+    fi
 }
 
 # ── Interactive Mode ───────────────────────────────────────────────────────────
-interactive_mode() {
-    echo -e "${CYAN}===================================================${ENDCOLOR}"
-    echo -e "          ${BLUE}Arch-based Post-Install Script${ENDCOLOR}"
-    echo -e "${CYAN}===================================================${ENDCOLOR}"
+main() {
+    clear
+    echo -e "${MAGENTA}===================================================${RESET}"
+    echo -e "${CYAN}        Arch Post-Installation Wizard${RESET}"
+    echo -e "${MAGENTA}===================================================${RESET}"
     echo
 
-    echo -e "${BLUE}System Information:${ENDCOLOR}"
-    echo -e "  Hostname:      ${GREEN}$(hostname)${ENDCOLOR}"
-    echo -e "  OS:            ${GREEN}$(cat /etc/os-release | grep PRETTY_NAME | cut -d'"' -f2)${ENDCOLOR}"
-    echo
+    # Check for paru installation
+    if ! command -v paru >/dev/null 2>&1; then
+        warn "paru (AUR helper) is not installed."
+        read -r -p "Would you like to install paru now? (y/N): " install_paru
+        if [[ "$install_paru" =~ ^[Yy]$ ]]; then
+            info "Installing paru dependencies..."
+            sudo pacman -S --needed --noconfirm base-devel
 
-    echo -e "${BLUE}Core Packages:${ENDCOLOR}"
-    echo "  ${CORE_PACKAGES}"
-    echo
-
-    echo -e "${BLUE}Extra Packages (optional):${ENDCOLOR}"
-    echo "  ${EXTRA_PACKAGES}"
-    echo
-
-    read -r -p "Install extra packages? (y/N): " install_extra < /dev/tty
-
-    if [[ "$install_extra" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$CORE_PACKAGES $EXTRA_PACKAGES"
-        echo -e "${GREEN}→ Will install core + extra packages${ENDCOLOR}"
-    else
-        PACKAGES_TO_INSTALL="$CORE_PACKAGES"
-        echo -e "${YELLOW}→ Will install core packages only${ENDCOLOR}"
+            info "Cloning and building paru..."
+            local tmp_dir=$(mktemp -d)
+            git clone https://aur.archlinux.org/paru-bin.git "$tmp_dir"
+            (cd "$tmp_dir" && makepkg -si --noconfirm)
+            rm -rf "$tmp_dir"
+            success "paru installed successfully"
+        else
+            error "paru is required for AUR packages. Exiting script."
+            exit 1
+        fi
     fi
 
-    # VS Code prompt (AUR package)
-    echo
-    read -r -p "Install Visual Studio Code (visual-studio-code-bin from AUR)? (y/N): " install_vscode < /dev/tty
+    PACKAGES_TO_INSTALL="$CORE_PACKAGES"
 
-    # Cooling packages prompt
+    # ── Component Prompts ─────────────────────────────────────────────────────
     echo
-    read -r -p "Install cooling packages (coolercontrol + coolercontrold)? (y/N): " install_cooling < /dev/tty
+    read -r -p "Install extra desktop applications? (Discord, Ghostty, Vivaldi, etc.) (y/N): " install_extra
+    if [[ "$install_extra" =~ ^[Yy]$ ]]; then
+        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_PACKAGES"
+        echo -e "${GREEN}→ Added extra packages${ENDCOLOR}"
+    fi
+
+    echo
+    read -r -p "Install Visual Studio Code from the AUR? (y/N): " install_vscode
+
+    echo
+    read -r -p "Install cooling manager control tools (CoolerControl)? (y/N): " install_cooling
     if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $COOLING_PACKAGES"
-        echo -e "${GREEN}→ Will also install cooling packages${ENDCOLOR}"
+        echo -e "${GREEN}→ Added cooling packages${ENDCOLOR}"
     fi
 
     echo
-    echo -e "${YELLOW}Ready to proceed with the following:${RESET}"
-    echo "   • System update"
-    echo "   • Install: $PACKAGES_TO_INSTALL"
-    [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru)"
+    echo -e "${YELLOW}Ready to proceed with the following actions:${RESET}"
+    echo "   • Synchronize system repositories and core system update"
+    echo "   • Target packages: $PACKAGES_TO_INSTALL"
+    [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru AUR pipeline)"
     echo
 
-    read -r -p "Press [Enter] to continue or type Q to quit: " confirm < /dev/tty
+    read -r -p "Press [Enter] to execute installation matrix or type Q to quit: " confirm
 
     if [[ "$confirm" =~ ^[Qq]$ ]]; then
         echo "Setup cancelled by user."
@@ -146,23 +130,23 @@ interactive_mode() {
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
 
-    # Install VS Code with paru (AUR only)
+    # Install VS Code with paru cleanly if flagged
     if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
         info "Installing Visual Studio Code from AUR..."
-        paru -S --noconfirm "$VSCODE_PACKAGE"
-        success "Visual Studio Code installed"
+        paru -S --needed --noconfirm "$VSCODE_PACKAGE"
+        success "Visual Studio Code installation synced"
     fi
 
-    # ── Post-install actions ─────────────────────────────────────────────────
+    # ── Post-install Daemon Hooks ────────────────────────────────────────────
     if [[ "$PACKAGES_TO_INSTALL" == *coolercontrold* ]]; then
         echo
-        info "Enabling and starting CoolerControl daemon..."
+        info "Enabling and starting CoolerControl system daemon..."
         sudo systemctl enable --now coolercontrold
-        sudo systemctl status coolercontrold --no-pager
+        sudo systemctl status coolercontrold --no-pager || true
     fi
 
     echo
-    success "Post-installation completed successfully!"
+    success "Post-installation sequence completed successfully!"
 }
 
 # ── Main Logic ─────────────────────────────────────────────────────────────────
@@ -177,7 +161,5 @@ if [[ $# -gt 0 ]]; then
         fi
     done
 else
-    interactive_mode
+    main
 fi
-
-exit 0
