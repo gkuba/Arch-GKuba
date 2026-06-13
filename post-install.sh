@@ -32,9 +32,6 @@ COOLING_PACKAGES="coolercontrol coolercontrold"
 # AUR package definition
 VSCODE_PACKAGE="visual-studio-code-bin"
 
-# GitHub Repo for Wallpapers
-REPO_URL="https://github.com/gkuba/Arch-GKuba"
-
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
     cat <<EOF
@@ -117,17 +114,10 @@ main() {
     fi
 
     echo
-    read -r -p "Setup Wallpapers? (Pulls to ~/Wallpapers and symlinks to ~/Pictures/Wallpapers) (y/N): " setup_wallpapers
-    if [[ "$setup_wallpapers" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}→ Added Wallpapers${ENDCOLOR}"
-    fi
-
-    echo
     echo -e "${YELLOW}Ready to proceed with the following actions:${RESET}"
     echo "   • Synchronize system repositories and core system update"
     echo "   • Target packages: $PACKAGES_TO_INSTALL"
     [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru AUR pipeline)"
-    [[ "$setup_wallpapers" =~ ^[Yy]$ ]] && echo "   • Clone $REPO_URL and map Wallpapers to Home folder"
     echo
 
     read -r -p "Press [Enter] to execute installation matrix or type Q to quit: " confirm
@@ -155,64 +145,8 @@ main() {
         sudo systemctl status coolercontrold --no-pager || true
     fi
 
-    # ── Wallpaper Pipeline ───────────────────────────────────────────────────
-    if [[ "$setup_wallpapers" =~ ^[Yy]$ ]]; then
-        echo
-        info "Beginning Wallpaper configuration..."
-
-        local temp_repo_dir
-        temp_repo_dir=$(mktemp -d -t arch-gkuba-XXXXXX)
-        local final_home_wallpapers="$HOME/Wallpapers"
-        local pictures_dir="$HOME/Pictures"
-        local target_link="$pictures_dir/Wallpapers"
-
-        info "Cloning repository temporarily to check out asset layers..."
-        git clone --depth 1 "$REPO_URL" "$temp_repo_dir"
-
-        # Check if Wallpapers directory exists inside the repository
-        if [[ -d "$temp_repo_dir/Wallpapers" ]]; then
-
-            # Safe deployment check for the final home dir directory
-            if [[ -d "$final_home_wallpapers" ]]; then
-                warn "Directory $final_home_wallpapers already exists. Updating contents..."
-                cp -r "$temp_repo_dir/Wallpapers/." "$final_home_wallpapers/"
-            else
-                info "Moving Wallpapers folder directly into your home path..."
-                mv "$temp_repo_dir/Wallpapers" "$final_home_wallpapers"
-            fi
-
-            # Ensure ~/Pictures directory tree exists
-            mkdir -p "$pictures_dir"
-
-            # Clean path check for symlink deployment
-            if [[ -L "$target_link" ]]; then
-                info "Updating existing Wallpapers symlink..."
-                rm "$target_link"
-            elif [[ -d "$target_link" ]]; then
-                warn "A physical directory already exists at $target_link. Backing up to $target_link.bak..."
-                mv "$target_link" "${target_link}.bak"
-            fi
-
-            ln -s "$final_home_wallpapers" "$target_link"
-            success "Wallpapers folder extracted to $final_home_wallpapers and linked to $target_link!"
-        else
-            error "Could not locate 'Wallpapers' directory inside the cloned repository layer."
-        fi
-
-        # Wipe out the temporary git clone path footprint entirely
-        rm -rf "$temp_repo_dir"
-    fi
-
     echo
     success "Post-installation sequence completed successfully!"
-
-    # ── Self Destruct Protocol ────────────────────────────────────────────────
-    # Because you are running this script directly via a curl piper, we use a
-    # safe check. If it exists on the local storage system, it cleans itself up.
-    if [[ -f "$0" ]]; then
-        info "Cleaning up installer execution file..."
-        rm -- "$0"
-    fi
 }
 
 # ── Main Logic ─────────────────────────────────────────────────────────────────
