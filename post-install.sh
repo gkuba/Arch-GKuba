@@ -117,7 +117,7 @@ main() {
     fi
 
     echo
-    read -r -p "Setup Wallpapers? (Pulls repository and symlinks to ~/Pictures/Wallpapers) (y/N): " setup_wallpapers
+    read -r -p "Setup Wallpapers? (Pulls to ~/Wallpapers and symlinks to ~/Pictures/Wallpapers) (y/N): " setup_wallpapers
     if [[ "$setup_wallpapers" =~ ^[Yy]$ ]]; then
         echo -e "${GREEN}→ Added Wallpapers${ENDCOLOR}"
     fi
@@ -127,7 +127,7 @@ main() {
     echo "   • Synchronize system repositories and core system update"
     echo "   • Target packages: $PACKAGES_TO_INSTALL"
     [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru AUR pipeline)"
-    [[ "$setup_wallpapers" =~ ^[Yy]$ ]] && echo "   • Clone $REPO_URL and map Wallpapers directory"
+    [[ "$setup_wallpapers" =~ ^[Yy]$ ]] && echo "   • Clone $REPO_URL and map Wallpapers to Home folder"
     echo
 
     read -r -p "Press [Enter] to execute installation matrix or type Q to quit: " confirm
@@ -160,22 +160,28 @@ main() {
         echo
         info "Beginning Wallpaper configuration..."
 
-        local repo_dir="$HOME"
+        local temp_repo_dir
+        temp_repo_dir=$(mktemp -d -t arch-gkuba-XXXXXX)
+        local final_home_wallpapers="$HOME/Wallpapers"
         local pictures_dir="$HOME/Pictures"
         local target_link="$pictures_dir/Wallpapers"
 
-        # Safe cloning
-        if [[ -d "$repo_dir" ]]; then
-            warn "Directory $repo_dir already exists. Pulling latest updates..."
-            (cd "$repo_dir" && git pull)
-        else
-            info "Cloning configuration repo into user home directory..."
-            git clone "$REPO_URL" "$repo_dir"
-        fi
+        info "Cloning repository temporarily to check out asset layers..."
+        git clone --depth 1 "$REPO_URL" "$temp_repo_dir"
 
-        # Process the Wallpapers folder specifically
-        if [[ -d "$repo_dir/Wallpapers" ]]; then
-            # Ensure ~/Pictures target environment exists
+        # Check if Wallpapers directory exists inside the repository
+        if [[ -d "$temp_repo_dir/Wallpapers" ]]; then
+
+            # Safe deployment check for the final home dir directory
+            if [[ -d "$final_home_wallpapers" ]]; then
+                warn "Directory $final_home_wallpapers already exists. Updating contents..."
+                cp -r "$temp_repo_dir/Wallpapers/." "$final_home_wallpapers/"
+            else
+                info "Moving Wallpapers folder directly into your home path..."
+                mv "$temp_repo_dir/Wallpapers" "$final_home_wallpapers"
+            fi
+
+            # Ensure ~/Pictures directory tree exists
             mkdir -p "$pictures_dir"
 
             # Clean path check for symlink deployment
@@ -187,11 +193,14 @@ main() {
                 mv "$target_link" "${target_link}.bak"
             fi
 
-            ln -s "$repo_dir/Wallpapers" "$target_link"
-            success "Wallpapers folder dynamically linked to $target_link!"
+            ln -s "$final_home_wallpapers" "$target_link"
+            success "Wallpapers folder extracted to $final_home_wallpapers and linked to $target_link!"
         else
-            error "Could not locate 'Wallpapers' directory inside the cloned repository."
+            error "Could not locate 'Wallpapers' directory inside the cloned repository layer."
         fi
+
+        # Wipe out the temporary git clone path footprint entirely
+        rm -rf "$temp_repo_dir"
     fi
 
     echo
