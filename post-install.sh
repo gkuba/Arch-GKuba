@@ -119,7 +119,7 @@ main() {
     echo
     read -r -p "Setup Wallpapers? (Pulls repository and symlinks to ~/Pictures/Wallpapers) (y/N): " setup_wallpapers
     if [[ "$setup_wallpapers" =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}→ Added Wallpaper pipeline to sequence${ENDCOLOR}"
+        echo -e "${GREEN}→ Added Wallpapers${ENDCOLOR}"
     fi
 
     echo
@@ -160,7 +160,7 @@ main() {
         echo
         info "Beginning Wallpaper configuration..."
 
-        local repo_dir="$HOME/Arch-GKuba"
+        local repo_dir="$HOME"
         local pictures_dir="$HOME/Pictures"
         local target_link="$pictures_dir/Wallpapers"
 
