@@ -33,6 +33,9 @@ COOLING_PACKAGES="coolercontrol coolercontrold liquidctl"
 VSCODE_PACKAGE="visual-studio-code-bin"
 MSI_SENSOR_PACKAGE="nct6687d-dkms-git"
 
+# Remote configuration endpoints
+COOLERCONTROL_CONFIG_URL="https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml"
+
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
     cat <<EOF
@@ -122,7 +125,7 @@ main() {
     [[ "$install_cooling" =~ ^[Yy]$ ]] && echo "   • MSI Motherboard Fan Driver ($MSI_SENSOR_PACKAGE via paru AUR pipeline)"
     echo
 
-    read -r -p "Press [Enter] to execute installation matrix or type Q to quit: " confirm
+    read -r -p "Press [Enter] to continue with package installation or type Q to quit: " confirm
 
     if [[ "$confirm" =~ ^[Qq]$ ]]; then
         echo "Setup cancelled by user."
@@ -144,6 +147,19 @@ main() {
         info "Installing MSI Nuvoton sensor kernel module from AUR..."
         paru -S --needed --noconfirm "$MSI_SENSOR_PACKAGE"
         success "MSI sensor module installation complete"
+
+        echo
+        info "Ensuring CoolerControl service is inactive for configuration injection..."
+        sudo systemctl stop coolercontrold || true
+
+        info "Fetching custom optimized fan curve profile..."
+        local tmp_config=$(mktemp)
+        curl -fsSL "$COOLERCONTROL_CONFIG_URL" -o "$tmp_config"
+
+        info "Deploying custom configurations to root directory..."
+        sudo mkdir -p /etc/coolercontrol
+        sudo mv "$tmp_config" /etc/coolercontrol/config.toml
+        success "Custom profile successfully injected"
 
         echo
         info "Enabling and starting CoolerControl system daemon..."
