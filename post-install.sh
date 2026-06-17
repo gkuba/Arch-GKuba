@@ -26,11 +26,12 @@ CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
 # Extra packages (installed with pacman)
 EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
 
-# Cooling packages
-COOLING_PACKAGES="coolercontrol coolercontrold"
+# Cooling packages (liquidctl added here)
+COOLING_PACKAGES="coolercontrol coolercontrold liquidctl"
 
-# AUR package definition
+# AUR package definitions
 VSCODE_PACKAGE="visual-studio-code-bin"
+MSI_SENSOR_PACKAGE="nct6687d-dkms-git"
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 usage() {
@@ -107,10 +108,10 @@ main() {
     read -r -p "Install Visual Studio Code from the AUR? (y/N): " install_vscode
 
     echo
-    read -r -p "Install cooling manager control tools (CoolerControl)? (y/N): " install_cooling
+    read -r -p "Install cooling manager control tools (CoolerControl & MSI Nuvoton Driver)? (y/N): " install_cooling
     if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
         PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $COOLING_PACKAGES"
-        echo -e "${GREEN}→ Added cooling packages${ENDCOLOR}"
+        echo -e "${GREEN}→ Added cooling packages (including liquidctl)${ENDCOLOR}"
     fi
 
     echo
@@ -118,6 +119,7 @@ main() {
     echo "   • Synchronize system repositories and core system update"
     echo "   • Target packages: $PACKAGES_TO_INSTALL"
     [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru AUR pipeline)"
+    [[ "$install_cooling" =~ ^[Yy]$ ]] && echo "   • MSI Motherboard Fan Driver ($MSI_SENSOR_PACKAGE via paru AUR pipeline)"
     echo
 
     read -r -p "Press [Enter] to execute installation matrix or type Q to quit: " confirm
@@ -137,8 +139,12 @@ main() {
         success "Visual Studio Code installation synced"
     fi
 
-    # ── Post-install Daemon Hooks ────────────────────────────────────────────
-    if [[ "$PACKAGES_TO_INSTALL" == *coolercontrold* ]]; then
+    # Combined Cooling Module Execution Block
+    if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
+        info "Installing MSI Nuvoton sensor kernel module from AUR..."
+        paru -S --needed --noconfirm "$MSI_SENSOR_PACKAGE"
+        success "MSI sensor module installation complete"
+
         echo
         info "Enabling and starting CoolerControl system daemon..."
         sudo systemctl enable --now coolercontrold
