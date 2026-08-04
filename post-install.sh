@@ -21,7 +21,7 @@ warn()    { echo -e "${YELLOW}[WARN]${RESET} $*"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 
 # ── Configuration ──────────────────────────────────────────────────────────────
-CORE_PACKAGES="git curl unzip neovim fastfetch fzf"
+CORE_PACKAGES="git curl unzip neovim fastfetch fzf ttf-fira-code"
 
 # Extra packages (installed with pacman)
 EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
@@ -134,6 +134,7 @@ main() {
 
     checkUpdates
     installPackages "$PACKAGES_TO_INSTALL"
+    fc-cache -fv
 
     # Install VS Code with paru cleanly if flagged
     if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
