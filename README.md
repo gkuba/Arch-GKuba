@@ -15,9 +15,16 @@ Running without an action starts the wizard:
 ./post-install.sh
 ```
 
+To download and run the current script directly from a Bash-compatible terminal:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-GKuba/main/post-install.sh)
+```
+
 The wizard always includes the core package group, then asks whether to install
-the listed Extra Desktop Apps and the CoolerControl/MSI sensor group. It shows a
-summary and asks before applying changes. It updates the system, installs the
+the listed Extra Desktop Apps, the CoolerControl/MSI sensor group, and optional
+DESetupLinux wallpapers and/or cursor themes. Headless systems can skip the
+desktop assets. It shows a summary and asks before applying changes. It updates the system, installs the
 selected packages, ensures `paru` is installed through pacman, and refreshes the
 font cache. The core group includes Zsh and Starship. If Zsh is not already the
 login shell, the wizard asks whether to set it as the default and verifies the
@@ -35,16 +42,19 @@ The optional groups are:
   is downloaded from the DESetupLinux repository, the daemon is enabled, and
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
 
-## Run one package group
+## Run one package group or desktop assets
 
-The script accepts these three public actions. Each action updates the system
-and installs only its named group; the cooling action also installs the AUR
-sensor driver and applies the CoolerControl profile.
+The package actions update the system and install only their named group; the
+cooling action also installs the AUR sensor driver and applies the
+CoolerControl profile. The desktop-assets action prompts for wallpapers,
+cursors, or both and copies the selected DESetupLinux assets into the user's
+asset directories while retaining unrelated files. It does not update packages.
 
 ```bash
 ./post-install.sh installCorePackages
 ./post-install.sh installExtraDesktopApps
 ./post-install.sh installCooling
+./post-install.sh installDesktopAssets
 ```
 
 Show usage with:

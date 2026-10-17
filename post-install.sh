@@ -17,16 +17,18 @@ PACMAN_CORE_PACKAGES=(git curl unzip 7zip neovim fastfetch fzf ttf-fira-code zsh
 PACMAN_EXTRA_DESKTOP_PACKAGES=(discord ghostty obsidian vivaldi spotify-launcher solaar)
 PACMAN_COOLING_PACKAGES=(coolercontrol coolercontrold liquidctl)
 AUR_COOLING_PACKAGES=(nct6687d-dkms-git)
+DESETUP_REPO='https://github.com/gkuba/DESetupLinux.git'
 STARSHIP_FALLBACK_INSTALLER='https://starship.rs/install.sh'
 COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
 DEFAULT_INSTALL_EXTRA=no
 DEFAULT_INSTALL_COOLING=no
+DEFAULT_INSTALL_DESKTOP_ASSETS=no
 
 # Help and supported public actions
 usage() {
   cat <<EOF
 Arch Post-Install Script
-Usage: $(basename "$0") [installCorePackages|installExtraDesktopApps|installCooling|--help]
+Usage: $(basename "$0") [installCorePackages|installExtraDesktopApps|installCooling|installDesktopAssets|--help]
 
 No argument runs the interactive wizard. Each install action runs only its
 package group, after a system update. Run as your user; sudo is requested as needed.
@@ -34,6 +36,7 @@ package group, after a system update. Run as your user; sudo is requested as nee
   installCorePackages       Install core packages and configure the Zsh login shell
   installExtraDesktopApps   Install optional desktop applications
   installCooling            Install CoolerControl and MSI sensor support
+  installDesktopAssets      Copy selected wallpapers and/or cursor themes
 EOF
 }
 
@@ -68,7 +71,7 @@ draw_screen() {
   local active="$1" item done mark color
   shift
   printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Configuring Login Shell' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Configuring Login Shell' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
       for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
@@ -228,10 +231,41 @@ run_group() {
   if [[ "$name" == cooling ]]; then installAurPackages "${AUR_COOLING_PACKAGES[@]}"; applyCoolerControlConfig; fi
   success "$name package group complete."
 }
+installDesktopAssets() {
+  local choice scratch
+  local wallpapers=no cursors=no
+  assert_prerequisites
+  require_commands git
+  while true; do
+    read -r -p 'Choose [w]allpapers, [c]ursors, or [b]oth: ' choice || return 1
+    case "${choice,,}" in
+      w|wallpapers) wallpapers=yes; break ;;
+      c|cursors) cursors=yes; break ;;
+      b|both) wallpapers=yes; cursors=yes; break ;;
+      *) warn "Enter 'w', 'c', or 'b'." ;;
+    esac
+  done
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/desktop-assets.XXXXXXXX")
+  if ! git clone --depth=1 "$DESETUP_REPO" "$scratch/DESetupLinux"; then
+    rm -rf -- "$scratch"; error 'Could not download DESetupLinux assets.'; return 1
+  fi
+  if [[ "$wallpapers" == yes ]]; then
+    [[ -d "$scratch/DESetupLinux/Wallpapers" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux Wallpapers directory not found.'; return 1; }
+    mkdir -p "$HOME/Pictures/Wallpapers"
+    cp -a "$scratch/DESetupLinux/Wallpapers/." "$HOME/Pictures/Wallpapers/"
+  fi
+  if [[ "$cursors" == yes ]]; then
+    [[ -d "$scratch/DESetupLinux/.icons" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux .icons directory not found.'; return 1; }
+    mkdir -p "$HOME/.icons"
+    cp -a "$scratch/DESetupLinux/.icons/." "$HOME/.icons/"
+  fi
+  rm -rf -- "$scratch"
+  success 'Selected desktop assets copied; unrelated destination files were retained.'
+}
 
 # Wizard prompts and summary
 gatherWizardAnswers() {
-  INSTALL_EXTRA=no; INSTALL_COOLING=no; SET_ZSH_SHELL=no
+  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; SET_ZSH_SHELL=no
   local -a package_lines=()
   append_wrapped_packages package_lines "${PACMAN_CORE_PACKAGES[@]}"
   wizard_panel 'Core packages (always included)' "${package_lines[@]}"
@@ -248,6 +282,7 @@ gatherWizardAnswers() {
   package_lines+=('CoolerControl profile will also be applied.')
   wizard_panel 'CoolerControl and MSI sensor support' "${package_lines[@]}"
   if ask_yes_no 'Install CoolerControl and its MSI sensor driver?' "$DEFAULT_INSTALL_COOLING"; then INSTALL_COOLING=yes; fi
+  if ask_yes_no 'Install optional wallpapers and/or cursor themes?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then INSTALL_DESKTOP_ASSETS=yes; fi
   return 0
 }
 showPlan() {
@@ -266,6 +301,7 @@ showPlan() {
     append_wrapped_packages lines "${AUR_COOLING_PACKAGES[@]}"
     lines+=('Apply CoolerControl profile and enable daemon')
   fi
+  [[ "$INSTALL_DESKTOP_ASSETS" == yes ]] && lines+=('Choose and copy DESetupLinux wallpapers and/or cursor themes')
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
 
@@ -313,6 +349,13 @@ main() {
   else
     completed+=('Installing AUR Packages' 'Applying CoolerControl Config')
   fi
+  if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Installing Desktop Assets' "${completed[@]}"
+    run_in_progress_area installDesktopAssets
+    completed+=('Installing Desktop Assets')
+  else
+    completed+=('Installing Desktop Assets')
+  fi
   completed+=('Applying CoolerControl Config')
   if [[ "$SET_ZSH_SHELL" == yes ]]; then
     completed+=('Configuring Login Shell')
@@ -327,7 +370,7 @@ main() {
 if (($# == 0)); then main; else
   case "$1" in
     --help|-h) usage ;;
-    installCorePackages|installExtraDesktopApps|installCooling) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
+    installCorePackages|installExtraDesktopApps|installCooling|installDesktopAssets) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi
