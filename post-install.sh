@@ -282,14 +282,16 @@ gatherWizardAnswers() {
   package_lines+=('CoolerControl profile will also be applied.')
   wizard_panel 'CoolerControl and MSI sensor support' "${package_lines[@]}"
   if ask_yes_no 'Install CoolerControl and its MSI sensor driver?' "$DEFAULT_INSTALL_COOLING"; then INSTALL_COOLING=yes; fi
-  if ask_yes_no 'Install optional wallpapers and/or cursor themes?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then INSTALL_DESKTOP_ASSETS=yes; fi
+  local -a desktop_asset_lines=()
+  append_wrapped_packages desktop_asset_lines 'Wallpapers' 'Cursor themes'
+  wizard_panel 'Optional Desktop Environment Items' "${desktop_asset_lines[@]}"
+  if ask_yes_no 'Install these desktop environment items?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then INSTALL_DESKTOP_ASSETS=yes; fi
   return 0
 }
 showPlan() {
   local -a lines=('Update system')
   lines+=('Core packages:')
   append_wrapped_packages lines "${PACMAN_CORE_PACKAGES[@]}"
-  [[ "$SET_ZSH_SHELL" == yes ]] && lines+=('Set Zsh as the default login shell')
   if [[ "$INSTALL_EXTRA" == yes ]]; then
     lines+=('Extra Desktop Apps:')
     append_wrapped_packages lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
@@ -301,7 +303,11 @@ showPlan() {
     append_wrapped_packages lines "${AUR_COOLING_PACKAGES[@]}"
     lines+=('Apply CoolerControl profile and enable daemon')
   fi
-  [[ "$INSTALL_DESKTOP_ASSETS" == yes ]] && lines+=('Choose and copy DESetupLinux wallpapers and/or cursor themes')
+  if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
+    lines+=('Optional Desktop Environment Items:')
+    append_wrapped_packages lines 'Wallpapers' 'Cursor themes'
+  fi
+  [[ "$SET_ZSH_SHELL" == yes ]] && lines+=('Set Zsh as the default login shell')
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
 

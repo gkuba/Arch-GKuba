@@ -30,8 +30,8 @@ selections:
   `liquidctl`, and `nct6687d-dkms-git` from the AUR. The CoolerControl profile
   is downloaded from the DESetupLinux repository, the daemon is enabled, and
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
-- **Desktop assets:** wallpapers, cursor themes, or both from DESetupLinux.
-  Skip this option on headless systems.
+- **Desktop environment items:** wallpapers and cursor themes from DESetupLinux.
+  Choose either or both when prompted; skip this option on headless systems.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.
