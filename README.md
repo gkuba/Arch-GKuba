@@ -21,19 +21,8 @@ To download and run the current script directly from a Bash-compatible terminal:
 bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-GKuba/main/post-install.sh)
 ```
 
-The wizard always includes the core package group, then asks whether to install
-the listed Extra Desktop Apps, the CoolerControl/MSI sensor group, and optional
-DESetupLinux wallpapers and/or cursor themes. Headless systems can skip the
-desktop assets. It shows a summary and asks before applying changes. It updates the system, installs the
-selected packages, ensures `paru` is installed through pacman, and refreshes the
-font cache. The core group includes Zsh and Starship. If Zsh is not already the
-login shell, the wizard asks whether to set it as the default and verifies the
-account change after installation. Starship is installed from pacman when
-available; its upstream installer is retained as a fallback. Package manager
-confirmation prompts are skipped after you approve the wizard plan. The script
-does not clone or build paru from an external repository.
-
-The optional groups are:
+The wizard always includes the core packages. It then offers these optional
+selections:
 
 - **Extra Desktop Apps:** Discord, Ghostty, Obsidian, Vivaldi,
   Spotify Launcher, and Solaar.
@@ -41,14 +30,27 @@ The optional groups are:
   `liquidctl`, and `nct6687d-dkms-git` from the AUR. The CoolerControl profile
   is downloaded from the DESetupLinux repository, the daemon is enabled, and
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
+- **Desktop assets:** wallpapers, cursor themes, or both from DESetupLinux.
+  Skip this option on headless systems.
 
-## Run one package group or desktop assets
+Before making changes, the wizard summarizes the selected actions and asks for
+confirmation. It then updates the system and installs the selected packages.
+After approval, package manager confirmation prompts are skipped. The script
+also ensures `paru` is installed through pacman and refreshes the font cache.
 
-The package actions update the system and install only their named group; the
-cooling action also installs the AUR sensor driver and applies the
-CoolerControl profile. The desktop-assets action prompts for wallpapers,
-cursors, or both and copies the selected DESetupLinux assets into the user's
-asset directories while retaining unrelated files. It does not update packages.
+The core packages include Zsh and Starship. If Zsh is not already the login
+shell, the wizard asks whether to set it as the default and verifies the change.
+Starship is installed from pacman when available, with its upstream installer
+retained as a fallback. The script does not clone or build paru from an
+external repository.
+
+## Run an action directly
+
+Each package action updates the system and installs its named group. The
+cooling action also installs the AUR sensor driver and applies the CoolerControl
+profile. `installDesktopAssets` prompts you to choose wallpapers, cursors, or
+both, then copies them into the matching user directories without removing
+unrelated files. This action does not update packages.
 
 ```bash
 ./post-install.sh installCorePackages
@@ -56,6 +58,8 @@ asset directories while retaining unrelated files. It does not update packages.
 ./post-install.sh installCooling
 ./post-install.sh installDesktopAssets
 ```
+
+Run the script without an action to use the full interactive wizard.
 
 Show usage with:
 
