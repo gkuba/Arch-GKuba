@@ -352,6 +352,9 @@ main() {
   [[ "$tty" == yes ]] && draw_screen 'Gathering Information' || printf 'Arch Post-Install Script\n\n'
   gatherWizardAnswers
   local -a completed=('Gathering Information')
+  # The shell stage is already satisfied when Zsh was the login shell before
+  # the wizard began, even though no shell change was needed.
+  loginShellIsZsh && completed+=('Configuring Login Shell')
   [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
   showPlan
   confirm_plan || { info 'Setup cancelled; no changes were made.'; return 0; }
