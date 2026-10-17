@@ -232,29 +232,31 @@ run_group() {
   success "$name package group complete."
 }
 installDesktopAssets() {
-  local choice scratch
-  local wallpapers=no cursors=no
+  local scratch choice
+  if [[ "${WANT_WALLPAPERS:-no}" != yes && "${WANT_CURSORS:-no}" != yes ]]; then
+    while true; do
+      read -r -p 'Choose [w]allpapers, [c]ursor themes, or [b]oth: ' choice || return 1
+      case "${choice,,}" in
+        w|wallpapers) WANT_WALLPAPERS=yes; break ;;
+        c|cursors|cursor) WANT_CURSORS=yes; break ;;
+        b|both) WANT_WALLPAPERS=yes; WANT_CURSORS=yes; break ;;
+        *) warn "Enter 'w', 'c', or 'b'." ;;
+      esac
+    done
+  fi
   assert_prerequisites
-  require_commands git
-  while true; do
-    read -r -p 'Choose [w]allpapers, [c]ursors, or [b]oth: ' choice || return 1
-    case "${choice,,}" in
-      w|wallpapers) wallpapers=yes; break ;;
-      c|cursors) cursors=yes; break ;;
-      b|both) wallpapers=yes; cursors=yes; break ;;
-      *) warn "Enter 'w', 'c', or 'b'." ;;
-    esac
-  done
+  command -v git >/dev/null 2>&1 || { error 'git is required to download desktop assets.'; return 1; }
+  [[ "$WANT_WALLPAPERS" == yes || "$WANT_CURSORS" == yes ]] || { error 'Select wallpapers, cursor themes, or both first.'; return 2; }
   scratch=$(mktemp -d "${TMPDIR:-/tmp}/desktop-assets.XXXXXXXX")
   if ! git clone --depth=1 "$DESETUP_REPO" "$scratch/DESetupLinux"; then
     rm -rf -- "$scratch"; error 'Could not download DESetupLinux assets.'; return 1
   fi
-  if [[ "$wallpapers" == yes ]]; then
+  if [[ "$WANT_WALLPAPERS" == yes ]]; then
     [[ -d "$scratch/DESetupLinux/Wallpapers" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux Wallpapers directory not found.'; return 1; }
     mkdir -p "$HOME/Pictures/Wallpapers"
     cp -a "$scratch/DESetupLinux/Wallpapers/." "$HOME/Pictures/Wallpapers/"
   fi
-  if [[ "$cursors" == yes ]]; then
+  if [[ "$WANT_CURSORS" == yes ]]; then
     [[ -d "$scratch/DESetupLinux/.icons" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux .icons directory not found.'; return 1; }
     mkdir -p "$HOME/.icons"
     cp -a "$scratch/DESetupLinux/.icons/." "$HOME/.icons/"
@@ -266,6 +268,7 @@ installDesktopAssets() {
 # Wizard prompts and summary
 gatherWizardAnswers() {
   INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; SET_ZSH_SHELL=no
+  WANT_WALLPAPERS=no; WANT_CURSORS=no
   local -a package_lines=()
   append_wrapped_packages package_lines "${PACMAN_CORE_PACKAGES[@]}"
   wizard_panel 'Core packages (always included)' "${package_lines[@]}"
@@ -285,7 +288,19 @@ gatherWizardAnswers() {
   local -a desktop_asset_lines=()
   append_wrapped_packages desktop_asset_lines 'Wallpapers' 'Cursor themes'
   wizard_panel 'Optional Desktop Environment Items' "${desktop_asset_lines[@]}"
-  if ask_yes_no 'Install these desktop environment items?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then INSTALL_DESKTOP_ASSETS=yes; fi
+  if ask_yes_no 'Install these desktop environment items?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then
+    INSTALL_DESKTOP_ASSETS=yes
+    local choice
+    while true; do
+      read -r -p 'Choose [w]allpapers, [c]ursor themes, or [b]oth: ' choice || return 1
+      case "${choice,,}" in
+        w|wallpapers) WANT_WALLPAPERS=yes; break ;;
+        c|cursors|cursor) WANT_CURSORS=yes; break ;;
+        b|both) WANT_WALLPAPERS=yes; WANT_CURSORS=yes; break ;;
+        *) warn "Enter 'w', 'c', or 'b'." ;;
+      esac
+    done
+  fi
   return 0
 }
 showPlan() {
@@ -305,7 +320,10 @@ showPlan() {
   fi
   if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
     lines+=('Optional Desktop Environment Items:')
-    append_wrapped_packages lines 'Wallpapers' 'Cursor themes'
+    local -a selected_assets=()
+    [[ "$WANT_WALLPAPERS" == yes ]] && selected_assets+=('Wallpapers')
+    [[ "$WANT_CURSORS" == yes ]] && selected_assets+=('Cursor themes')
+    append_wrapped_packages lines "${selected_assets[@]}"
   fi
   [[ "$SET_ZSH_SHELL" == yes ]] && lines+=('Set Zsh as the default login shell')
   wizard_panel 'Setup Plan' "${lines[@]}"
@@ -357,7 +375,7 @@ main() {
   fi
   if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing Desktop Assets' "${completed[@]}"
-    run_in_progress_area installDesktopAssets
+    installDesktopAssets
     completed+=('Installing Desktop Assets')
   else
     completed+=('Installing Desktop Assets')
