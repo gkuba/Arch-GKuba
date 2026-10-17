@@ -290,6 +290,9 @@ gatherWizardAnswers() {
   wizard_panel 'Optional Desktop Environment Items' "${desktop_asset_lines[@]}"
   if ask_yes_no 'Install these desktop environment items?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then
     INSTALL_DESKTOP_ASSETS=yes
+    # Replace the yes/no question with the follow-up choice, leaving the
+    # desktop-items panel visible above it.
+    if is_tty; then printf '\033[1A\r\033[2K'; fi
     local choice
     while true; do
       read -r -p 'Choose [w]allpapers, [c]ursor themes, or [b]oth: ' choice || return 1
