@@ -19,8 +19,12 @@ The wizard always includes the core package group, then asks whether to install
 the listed Extra Desktop Apps and the CoolerControl/MSI sensor group. It shows a
 summary and asks before applying changes. It updates the system, installs the
 selected packages, ensures `paru` is installed through pacman, and refreshes the
-font cache. Package manager confirmation prompts are skipped after you approve
-the wizard plan. It does not clone or build paru from an external repository.
+font cache. The core group includes Zsh and Starship. If Zsh is not already the
+login shell, the wizard asks whether to set it as the default and verifies the
+account change after installation. Starship is installed from pacman when
+available; its upstream installer is retained as a fallback. Package manager
+confirmation prompts are skipped after you approve the wizard plan. The script
+does not clone or build paru from an external repository.
 
 The optional groups are:
 
@@ -54,7 +58,7 @@ and are not supported command-line actions.
 
 ## Core packages
 
-Git, curl, unzip, 7zip, Neovim, Fastfetch, fzf, and Fira Code.
+Git, curl, unzip, 7zip, Neovim, Fastfetch, fzf, Fira Code, Zsh, and Starship.
 
 Package lists are kept near the top of `post-install.sh`, grouped by package
 manager. The script currently maps the groups to pacman and the MSI sensor
