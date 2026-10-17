@@ -1,188 +1,261 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Arch-based Post-Install Script - GKuba Edition
-# =============================================================================
+set -Eeuo pipefail
 
-set -euo pipefail
+# Colors (kept individually editable)
+RED=$'\033[31m'
+GREEN=$'\033[32m'
+YELLOW=$'\033[33m'
+BLUE=$'\033[34m'
+MAGENTA=$'\033[35m'
+CYAN=$'\033[36m'
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
+RESET=$'\033[0m'
 
-# ── Colors (Standardized with \033 for uniform cross-environment rendering) ───
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-BLUE="\033[34m"
-MAGENTA="\033[35m"
-CYAN="\033[36m"
-ENDCOLOR="\033[0m"
-RESET="\033[0m"
+# Package groups (manager-specific to support future distro mappings)
+PACMAN_CORE_PACKAGES=(git curl unzip 7zip neovim fastfetch fzf ttf-fira-code)
+PACMAN_EXTRA_DESKTOP_PACKAGES=(discord ghostty obsidian vivaldi spotify-launcher solaar)
+PACMAN_COOLING_PACKAGES=(coolercontrol coolercontrold liquidctl)
+AUR_COOLING_PACKAGES=(nct6687d-dkms-git)
+COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
+DEFAULT_INSTALL_EXTRA=no
+DEFAULT_INSTALL_COOLING=no
 
-info()    { echo -e "${BLUE}[INFO]${RESET} $*"; }
-success() { echo -e "${GREEN}[OK]${RESET} $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${RESET} $*"; }
-error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
-
-# ── Configuration ──────────────────────────────────────────────────────────────
-CORE_PACKAGES="git curl unzip neovim fastfetch fzf ttf-fira-code"
-
-# Extra packages (installed with pacman)
-EXTRA_PACKAGES="discord ghostty obsidian vivaldi spotify-launcher solaar"
-
-# Cooling packages (liquidctl added here)
-COOLING_PACKAGES="coolercontrol coolercontrold liquidctl"
-
-# AUR package definitions
-VSCODE_PACKAGE="visual-studio-code-bin"
-MSI_SENSOR_PACKAGE="nct6687d-dkms-git"
-
-# Remote configuration endpoints
-COOLERCONTROL_CONFIG_URL="https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml"
-
-# ── Help ───────────────────────────────────────────────────────────────────────
+# Help and supported public actions
 usage() {
-    cat <<EOF
-Usage: $(basename "$0") [FUNCTION...]
+  cat <<EOF
+Arch Post-Install Script
+Usage: $(basename "$0") [installCorePackages|installExtraDesktopApps|installCooling|--help]
 
-Available functions:
-  checkUpdates     Update system packages
-  installPackages  Install wanted packages
+No argument runs the interactive wizard. Each install action runs only its
+package group, after a system update. Run as your user; sudo is requested as needed.
 
-If no arguments are given, the script runs interactively.
+  installCorePackages       Install the core package group
+  installExtraDesktopApps   Install optional desktop applications
+  installCooling            Install CoolerControl and MSI sensor support
 EOF
-    exit 0
 }
 
-# ── Helper Functions ───────────────────────────────────────────────────────────
-
-checkUpdates() {
-    info "Checking for system updates..."
-    sudo pacman -Syu --noconfirm
-    success "System updated successfully"
+# Disable escape sequences when color output is unavailable or explicitly disabled.
+configureColors() {
+  if [[ ! -t 1 || -n "${NO_COLOR:-}" || "${TERM:-dumb}" == dumb ]]; then
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    MAGENTA=''
+    CYAN=''
+    BOLD=''
+    DIM=''
+    RESET=''
+  fi
 }
+configureColors
 
-installPackages() {
-    local pkgs="$1"
-    if [[ -n "$pkgs" ]]; then
-        info "Installing packages: $pkgs"
-        sudo pacman -S --needed --noconfirm $pkgs
-        success "Packages installed successfully"
+# Shared UI and validation helpers
+info() { printf '%s[INFO]%s %s\n' "$BLUE" "$RESET" "$*"; }
+success() { printf '%s[ OK ]%s %s\n' "$GREEN" "$RESET" "$*"; }
+warn() { printf '%s[WARN]%s %s\n' "$YELLOW" "$RESET" "$*"; }
+error() { printf '%s[ERR ]%s %s\n' "$RED" "$RESET" "$*" >&2; }
+is_tty() { [[ -t 0 && -t 1 && -n "${TERM:-}" && "${TERM:-dumb}" != dumb ]]; }
+assert_prerequisites() {
+  (( EUID != 0 )) || { error 'Run as your normal user; sudo is used only when needed.'; return 1; }
+  command -v sudo >/dev/null || { error 'sudo is required.'; return 1; }
+  [[ -r /etc/arch-release ]] || { error 'Arch-based systems only.'; return 1; }
+}
+draw_screen() {
+  local active="$1" item done mark color
+  shift
+  printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Finalizing'; do
+    mark='○'; color="$DIM"
+    if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
+      for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
+    fi
+    printf '  %s%s %s%s\n' "$color" "$mark" "$item" "$RESET"
+  done
+  printf '\n'
+}
+panel() {
+  local title="$1" line width=68
+  shift
+  (( ${#title} + 4 > width )) && width=$((${#title} + 4))
+  printf '%s┌─ %s ' "$CYAN" "$title"; printf '─%.0s' $(seq 1 $((width-${#title}-3))); printf '┐%s\n' "$RESET"
+  for line in "$@"; do printf '%s│%s %s\n' "$CYAN" "$RESET" "$line"; done
+  printf '%s└' "$CYAN"; printf '─%.0s' $(seq 1 "$width"); printf '┘%s\n' "$RESET"
+}
+append_wrapped_packages() {
+  local output_name="$1" line='' item separator=' · ' max_width=64
+  shift
+  local -n output_ref="$output_name"
+  for item in "$@"; do
+    if [[ -z "$line" ]]; then
+      line="  $item"
+    elif (( ${#line} + ${#separator} + ${#item} <= max_width )); then
+      line+="$separator$item"
     else
-        warn "No packages specified for installation"
+      output_ref+=("$line")
+      line="  $item"
     fi
+  done
+  [[ -n "$line" ]] && output_ref+=("$line")
+}
+wizard_panel() {
+  if is_tty; then printf '\033[13;1H\033[J'; fi
+  panel "$@"
+}
+ask_yes_no() {
+  local prompt="$1" default="$2" answer suffix='[y/N]'
+  [[ "$default" == yes ]] && suffix='[Y/n]'
+  while true; do
+    read -r -p "$prompt $suffix " answer || return 1
+    case "${answer,,}" in y|yes) return 0;; n|no) return 1;; '') [[ "$default" == yes ]] && return 0 || return 1;; *) printf 'Please answer y or n.\n';; esac
+  done
+}
+confirm_plan() { local answer; read -r -p 'Continue with this plan? [Y/n] ' answer || return 1; [[ "${answer,,}" != n && "${answer,,}" != no ]]; }
+spinner() {
+  local label="$1" chars='|/-\\' i=0 pid rc
+  shift
+  if ! is_tty; then "$@"; return; fi
+  "$@" & pid=$!
+  while kill -0 "$pid" 2>/dev/null; do printf '\r  %s%s%s %s' "$CYAN" "${chars:i++%4:1}" "$RESET" "$label"; sleep .12; done
+  if wait "$pid"; then rc=0; else rc=$?; fi
+  printf '\r\033[K'; return "$rc"
+}
+on_error() { local rc=$? line=${1:-?}; is_tty && printf '\033[r\033[?25h\n'; error "Stopped at line $line (exit $rc). See the preceding error."; exit "$rc"; }
+trap 'on_error $LINENO' ERR
+
+# Internal workflow helpers
+checkUpdates() { info 'Updating system packages.'; sudo pacman -Syu --noconfirm; }
+run_in_progress_area() {
+  if ! is_tty; then "$@"; return; fi
+  local rows rc=0
+  rows=$(tput lines 2>/dev/null || printf '24')
+  if (( rows < 18 )); then "$@"; return; fi
+  printf '\033[13;%sr\033[13;1H' "$rows"
+  "$@" || rc=$?
+  # Keep pacman/sudo diagnostics visible if a stage fails. On success the next
+  # draw_screen refreshes the display before beginning the following stage.
+  printf '\033[r'
+  return "$rc"
+}
+installPackages() { local -n group="$1"; ((${#group[@]})) && sudo pacman -S --needed --noconfirm "${group[@]}"; }
+ensureParu() {
+  command -v paru >/dev/null 2>&1 && { success 'paru is already installed.'; return; }
+  info 'Installing paru from the configured pacman repositories.'
+  sudo pacman -S --needed --noconfirm paru
+  command -v paru >/dev/null 2>&1 || { error 'paru installation did not complete.'; return 1; }
+  success 'paru is ready.'
+}
+installAurPackages() { ((${#@})) || return 0; ensureParu; paru -S --needed --noconfirm "$@"; }
+applyCoolerControlConfig() {
+  local tmp backup
+  tmp=$(mktemp "${TMPDIR:-/tmp}/coolercontrol.XXXXXXXX")
+  if ! curl -fsSL "$COOLERCONTROL_CONFIG_URL" -o "$tmp" || ! grep -qE '^[[:space:]]*\[' "$tmp"; then
+    rm -f -- "$tmp"; error 'Could not fetch a valid CoolerControl TOML profile.'; return 1
+  fi
+  sudo systemctl stop coolercontrold 2>/dev/null || true
+  sudo install -d -m 0755 /etc/coolercontrol
+  if sudo test -e /etc/coolercontrol/config.toml; then
+    backup="/etc/coolercontrol/config.toml.backup.$(date +%Y%m%d-%H%M%S)"
+    sudo cp -a /etc/coolercontrol/config.toml "$backup"
+    info "Backed up existing profile to $backup"
+  fi
+  sudo install -m 0644 "$tmp" /etc/coolercontrol/config.toml
+  rm -f -- "$tmp"
+  sudo systemctl enable --now coolercontrold
+  success 'CoolerControl profile applied; daemon enabled.'
+}
+run_group() {
+  local name="$1" array="$2"
+  assert_prerequisites
+  checkUpdates
+  installPackages "$array"
+  if [[ "$name" == cooling ]]; then installAurPackages "${AUR_COOLING_PACKAGES[@]}"; applyCoolerControlConfig; fi
+  success "$name package group complete."
 }
 
-# ── Interactive Mode ───────────────────────────────────────────────────────────
+# Wizard prompts and summary
+gatherWizardAnswers() {
+  INSTALL_EXTRA=no; INSTALL_COOLING=no
+  local -a package_lines=()
+  append_wrapped_packages package_lines "${PACMAN_CORE_PACKAGES[@]}"
+  wizard_panel 'Core packages (always included)' "${package_lines[@]}"
+  package_lines=()
+  append_wrapped_packages package_lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
+  wizard_panel 'Extra Desktop Apps' "${package_lines[@]}"
+  if ask_yes_no 'Install these extra desktop applications?' "$DEFAULT_INSTALL_EXTRA"; then INSTALL_EXTRA=yes; fi
+  package_lines=()
+  package_lines+=('CoolerControl packages:')
+  append_wrapped_packages package_lines "${PACMAN_COOLING_PACKAGES[@]}"
+  package_lines+=('MSI sensor driver (AUR):')
+  append_wrapped_packages package_lines "${AUR_COOLING_PACKAGES[@]}"
+  package_lines+=('CoolerControl profile will also be applied.')
+  wizard_panel 'CoolerControl and MSI sensor support' "${package_lines[@]}"
+  if ask_yes_no 'Install CoolerControl and its MSI sensor driver?' "$DEFAULT_INSTALL_COOLING"; then INSTALL_COOLING=yes; fi
+  return 0
+}
+showPlan() {
+  local -a lines=('Update system')
+  lines+=('Core packages:')
+  append_wrapped_packages lines "${PACMAN_CORE_PACKAGES[@]}"
+  if [[ "$INSTALL_EXTRA" == yes ]]; then
+    lines+=('Extra Desktop Apps:')
+    append_wrapped_packages lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
+  fi
+  if [[ "$INSTALL_COOLING" == yes ]]; then
+    lines+=('CoolerControl packages:')
+    append_wrapped_packages lines "${PACMAN_COOLING_PACKAGES[@]}"
+    lines+=('MSI sensor driver (AUR):')
+    append_wrapped_packages lines "${AUR_COOLING_PACKAGES[@]}"
+    lines+=('Apply CoolerControl profile and enable daemon')
+  fi
+  wizard_panel 'Setup Plan' "${lines[@]}"
+}
+
+# Public actions (the only accepted function arguments)
+installCorePackages() { run_group core PACMAN_CORE_PACKAGES; }
+installExtraDesktopApps() { run_group extra-desktop PACMAN_EXTRA_DESKTOP_PACKAGES; }
+installCooling() { run_group cooling PACMAN_COOLING_PACKAGES; }
+
+# Main wizard
 main() {
-    clear
-    echo -e "${MAGENTA}===================================================${RESET}"
-    echo -e "${CYAN}        Arch Post-Installation Wizard${RESET}"
-    echo -e "${MAGENTA}===================================================${RESET}"
-    echo
-
-    # Check for paru installation
-    if ! command -v paru >/dev/null 2>&1; then
-        warn "paru (AUR helper) is not installed."
-        read -r -p "Would you like to install paru now? (y/N): " install_paru
-        if [[ "$install_paru" =~ ^[Yy]$ ]]; then
-            info "Installing paru dependencies..."
-            sudo pacman -S --needed --noconfirm base-devel
-
-            info "Cloning and building paru..."
-            local tmp_dir=$(mktemp -d)
-            git clone https://aur.archlinux.org/paru-bin.git "$tmp_dir"
-            (cd "$tmp_dir" && makepkg -si --noconfirm)
-            rm -rf "$tmp_dir"
-            success "paru installed successfully"
-        else
-            error "paru is required for AUR packages. Exiting script."
-            exit 1
-        fi
-    fi
-
-    PACKAGES_TO_INSTALL="$CORE_PACKAGES"
-
-    # ── Component Prompts ─────────────────────────────────────────────────────
-    echo
-    read -r -p "Install extra desktop applications? (Discord, Ghostty, Vivaldi, etc.) (y/N): " install_extra
-    if [[ "$install_extra" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $EXTRA_PACKAGES"
-        echo -e "${GREEN}→ Added extra packages${ENDCOLOR}"
-    fi
-
-    echo
-    read -r -p "Install Visual Studio Code from the AUR? (y/N): " install_vscode
-
-    echo
-    read -r -p "Install cooling manager control tools (CoolerControl & MSI Nuvoton Driver)? (y/N): " install_cooling
-    if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
-        PACKAGES_TO_INSTALL="$PACKAGES_TO_INSTALL $COOLING_PACKAGES"
-        echo -e "${GREEN}→ Added cooling packages (including liquidctl)${ENDCOLOR}"
-    fi
-
-    echo
-    echo -e "${YELLOW}Ready to proceed with the following actions:${RESET}"
-    echo "   • Synchronize system repositories and core system update"
-    echo "   • Target packages: $PACKAGES_TO_INSTALL"
-    [[ "$install_vscode" =~ ^[Yy]$ ]] && echo "   • Visual Studio Code (via paru AUR pipeline)"
-    [[ "$install_cooling" =~ ^[Yy]$ ]] && echo "   • MSI Motherboard Fan Driver ($MSI_SENSOR_PACKAGE via paru AUR pipeline)"
-    echo
-
-    read -r -p "Press [Enter] to continue with package installation or type Q to quit: " confirm
-
-    if [[ "$confirm" =~ ^[Qq]$ ]]; then
-        echo "Setup cancelled by user."
-        exit 0
-    fi
-
-    checkUpdates
-    installPackages "$PACKAGES_TO_INSTALL"
-    fc-cache -fv
-
-    # Install VS Code with paru cleanly if flagged
-    if [[ "$install_vscode" =~ ^[Yy]$ ]]; then
-        info "Installing Visual Studio Code from AUR..."
-        paru -S --needed --noconfirm "$VSCODE_PACKAGE"
-        success "Visual Studio Code installation synced"
-    fi
-
-    # Combined Cooling Module Execution Block
-    if [[ "$install_cooling" =~ ^[Yy]$ ]]; then
-        info "Installing MSI Nuvoton sensor kernel module from AUR..."
-        paru -S --needed --noconfirm "$MSI_SENSOR_PACKAGE"
-        success "MSI sensor module installation complete"
-
-        echo
-        info "Ensuring CoolerControl service is inactive for configuration injection..."
-        sudo systemctl stop coolercontrold || true
-
-        info "Fetching custom optimized fan curve profile..."
-        local tmp_config=$(mktemp)
-        curl -fsSL "$COOLERCONTROL_CONFIG_URL" -o "$tmp_config"
-
-        info "Deploying custom configurations to root directory..."
-        sudo mkdir -p /etc/coolercontrol
-        sudo mv "$tmp_config" /etc/coolercontrol/config.toml
-        success "Custom profile successfully injected"
-
-        echo
-        info "Enabling and starting CoolerControl system daemon..."
-        sudo systemctl enable --now coolercontrold
-        sudo systemctl status coolercontrold --no-pager || true
-    fi
-
-    echo
-    success "Post-installation sequence completed successfully!"
+  assert_prerequisites
+  local tty=no; is_tty && tty=yes
+  [[ "$tty" == yes ]] && draw_screen 'Gathering Information' || printf 'Arch Post-Install Script\n\n'
+  gatherWizardAnswers
+  local -a completed=('Gathering Information')
+  [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
+  showPlan
+  confirm_plan || { info 'Setup cancelled; no changes were made.'; return 0; }
+  [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
+  run_in_progress_area checkUpdates; completed+=('Updating System')
+  [[ "$tty" == yes ]] && draw_screen 'Installing Pacman Packages' "${completed[@]}"
+  run_in_progress_area installPackages PACMAN_CORE_PACKAGES
+  [[ "$INSTALL_EXTRA" == yes ]] && run_in_progress_area installPackages PACMAN_EXTRA_DESKTOP_PACKAGES
+  [[ "$INSTALL_COOLING" == yes ]] && run_in_progress_area installPackages PACMAN_COOLING_PACKAGES
+  completed+=('Installing Pacman Packages')
+  [[ "$tty" == yes ]] && draw_screen 'Ensuring Paru' "${completed[@]}"
+  ensureParu; completed+=('Ensuring Paru')
+  if [[ "$INSTALL_COOLING" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Installing AUR Packages' "${completed[@]}"
+    installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
+    [[ "$tty" == yes ]] && draw_screen 'Applying CoolerControl Config' "${completed[@]}"
+    applyCoolerControlConfig
+  else
+    completed+=('Installing AUR Packages' 'Applying CoolerControl Config')
+  fi
+  completed+=('Applying CoolerControl Config')
+  [[ "$tty" == yes ]] && draw_screen 'Finalizing' "${completed[@]}"
+  command -v fc-cache >/dev/null 2>&1 && spinner 'Refreshing font cache' fc-cache -f
+  success 'Post-installation sequence completed successfully.'
 }
 
-# ── Main Logic ─────────────────────────────────────────────────────────────────
-
-if [[ $# -gt 0 ]]; then
-    for arg in "$@"; do
-        if declare -f "$arg" >/dev/null; then
-            "$arg"
-        else
-            error "No such function: $arg"
-            usage
-        fi
-    done
-else
-    main
+# Final dispatch
+if (($# == 0)); then main; else
+  case "$1" in
+    --help|-h) usage ;;
+    installCorePackages|installExtraDesktopApps|installCooling) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
+    *) error "Unknown action: $1"; usage; exit 2 ;;
+  esac
 fi

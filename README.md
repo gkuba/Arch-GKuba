@@ -1,73 +1,67 @@
-# Arch-Gkuba Post-Install
+# Arch-GKuba Post-Install
 
-This is my personal post-install script for fresh Arch Linux and CachyOS installations.
+A personal post-install script for Arch-based systems, including CachyOS. It
+installs selected package groups and can configure the CoolerControl service.
 
-It handles system updates and installs a curated set of essential and extra packages.
+Run it as your regular user. The script uses `sudo` only for system package,
+service, and configuration changes. It does not need to be started from a root
+shell.
 
----
+## Interactive setup
 
-## Requirements
-
-- Must be run as root (sudo su first)
-- Arch-based system (Arch Linux, CachyOS, EndeavourOS, etc.)
-
----
-
-## Quick Install (Full Setup)
-
-Run the following command as root:
+Running without an action starts the wizard:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh)
+./post-install.sh
 ```
 
----
+The wizard always includes the core package group, then asks whether to install
+the listed Extra Desktop Apps and the CoolerControl/MSI sensor group. It shows a
+summary and asks before applying changes. It updates the system, installs the
+selected packages, ensures `paru` is installed through pacman, and refreshes the
+font cache. Package manager confirmation prompts are skipped after you approve
+the wizard plan. It does not clone or build paru from an external repository.
 
-## Modular Usage
+The optional groups are:
 
-The script supports running specific parts only.
+- **Extra Desktop Apps:** Discord, Ghostty, Obsidian, Vivaldi,
+  Spotify Launcher, and Solaar.
+- **CoolerControl and MSI sensor support:** CoolerControl, its daemon,
+  `liquidctl`, and `nct6687d-dkms-git` from the AUR. The CoolerControl profile
+  is downloaded from the DESetupLinux repository, the daemon is enabled, and
+  an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
 
-### Available Functions
+## Run one package group
 
-Function          | Description
-------------------|--------------------------------------------------
-checkUpdates      | Update the system (pacman -Syu)
-installPackages   | Install the core + extra packages
-
-### Examples
+The script accepts these three public actions. Each action updates the system
+and installs only its named group; the cooling action also installs the AUR
+sensor driver and applies the CoolerControl profile.
 
 ```bash
-# Run full setup (default)
-bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh)
-
-# Only update the system
-bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) checkUpdates
-
-# Only install packages
-bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) installPackages
-
-# Only dnsStubFix
-bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-Gkuba/main/post-install.sh) dnsStubFix
+./post-install.sh installCorePackages
+./post-install.sh installExtraDesktopApps
+./post-install.sh installCooling
 ```
----
 
-## Packages Installed
+Show usage with:
 
-Core Packages:
-- git curl unzip neovim fastfetch fzf
+```bash
+./post-install.sh --help
+```
 
-Extra Packages (optional - you will be prompted):
-- discord code ghostty vivaldi
+The lower-level package and system helpers are internal implementation details
+and are not supported command-line actions.
 
----
+## Core packages
 
-## My Dotfiles
+Git, curl, unzip, 7zip, Neovim, Fastfetch, fzf, and Fira Code.
 
-My full dotfiles (.zshrc, Starship config, Neovim config, etc.) can be found here:
+Package lists are kept near the top of `post-install.sh`, grouped by package
+manager. The script currently maps the groups to pacman and the MSI sensor
+package to the AUR.
 
-→ https://github.com/gkuba/dotfiles
+## Dotfiles
 
----
-
-Note:
-After running this post-install script, I recommend running my separate setup-dotfiles.sh script to pull in my complete configuration.
+The separate dotfiles repository and setup script are available at
+[github.com/gkuba/dotfiles](https://github.com/gkuba/dotfiles). Local hosts-file
+entries are managed by that dotfiles setup, not by this post-install script.
