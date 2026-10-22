@@ -417,12 +417,28 @@ applyKdePlasmaConfig() {
   fi
   success 'Verified Breeze Dark as the active KDE color scheme.'
 
+  # Apply the custom Violet-Noir accent through KDE's supported helper so
+  # Plasma updates the active session as well as saving the setting.
+  local accent_output
+  if ! accent_output=$(plasma-apply-colorscheme --accent-color '#453078' BreezeDark 2>&1); then
+    if [[ "$accent_output" == *'already set'* ]]; then
+      info 'Breeze Dark is already active while applying the custom accent.'
+    else
+      error "Could not apply the Violet-Noir accent color: $accent_output"
+      return 1
+    fi
+  fi
+  local configured_accent
+  configured_accent=$(kreadconfig6 --file kdeglobals --group General --key AccentColor)
+  if [[ "$configured_accent" != '69,48,120' && "$configured_accent" != '#453078' ]]; then
+    error "Violet-Noir accent did not persist (KDE reports: ${configured_accent:-<empty>})."
+    return 1
+  fi
+  kwriteconfig6 --file kdeglobals --group General --key AccentColorFromWallpaper false
+  success 'Verified the Violet-Noir custom accent color.'
+
   # Breeze icons, without changing individual applications' bundled icons.
   kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
-
-  # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
-  kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
-  kwriteconfig6 --file kdeglobals --group General --key AccentColorFromWallpaper false
 
   # Oxygen window decoration. Remove the obsolete theme key so it uses the
   # Oxygen decoration's own defaults.
