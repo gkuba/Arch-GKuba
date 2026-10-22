@@ -500,6 +500,7 @@ subprocess.run([
   # Reuse the installed login wallpaper for the Plasma lock screen.
   local login_wallpaper='/var/lib/plasmalogin/wallpapers/login-wallpaper.png'
   if [[ -f "$login_wallpaper" ]]; then
+    local login_wallpaper_url="file://${login_wallpaper}"
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
@@ -512,7 +513,7 @@ subprocess.run([
       --group org.kde.image \
       --group General \
       --key Image \
-      "$login_wallpaper"
+      "$login_wallpaper_url"
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
@@ -520,7 +521,7 @@ subprocess.run([
       --group org.kde.image \
       --group General \
       --key PreviewImage \
-      "$login_wallpaper"
+      "$login_wallpaper_url"
     success 'Configured the Plasma lock-screen wallpaper.'
   fi
 
