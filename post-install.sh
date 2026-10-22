@@ -322,7 +322,13 @@ applyKdePlasmaConfig() {
   # Configure an hourly slideshow on every screen when wallpaper assets exist.
   local wallpaper_dir="$HOME/Pictures/Wallpapers"
   if [[ -d "$wallpaper_dir" ]]; then
-    require_commands python3 dbus-send || return 1
+    local required_command
+    for required_command in python3 dbus-send; do
+      if ! command -v "$required_command" >/dev/null 2>&1; then
+        error "$required_command is unavailable; cannot configure the Plasma wallpaper slideshow."
+        return 1
+      fi
+    done
     WALLPAPER_DIR="$wallpaper_dir" python3 -c '
 import json, os, subprocess
 
