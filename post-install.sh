@@ -419,6 +419,10 @@ applyKdePlasmaConfig() {
 
   # Apply the custom Violet-Noir accent through KDE's supported helper so
   # Plasma updates the active session as well as saving the setting.
+  # Seed the persisted value first; the helper can report that Breeze Dark is
+  # already active even while it applies the accent option.
+  kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
+  kwriteconfig6 --file kdeglobals --group General --key accentColorFromWallpaper false
   local accent_output
   if ! accent_output=$(plasma-apply-colorscheme --accent-color '#453078' BreezeDark 2>&1); then
     if [[ "$accent_output" == *'already set'* ]]; then
@@ -429,12 +433,14 @@ applyKdePlasmaConfig() {
     fi
   fi
   local configured_accent
-  configured_accent=$(kreadconfig6 --file kdeglobals --group General --key accentColor)
+  configured_accent=$(kreadconfig6 --file kdeglobals --group General --key AccentColor)
+  if [[ -z "$configured_accent" ]]; then
+    configured_accent=$(kreadconfig6 --file kdeglobals --group General --key accentColor)
+  fi
   if [[ "$configured_accent" != '69,48,120' && "$configured_accent" != '#453078' ]]; then
     error "Violet-Noir accent did not persist (KDE reports: ${configured_accent:-<empty>})."
     return 1
   fi
-  kwriteconfig6 --file kdeglobals --group General --key accentColorFromWallpaper false
   success 'Verified the Violet-Noir custom accent color.'
 
   # Breeze icons, without changing individual applications' bundled icons.
