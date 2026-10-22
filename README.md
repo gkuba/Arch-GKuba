@@ -32,6 +32,11 @@ selections:
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
 - **Desktop environment items:** wallpapers and cursor themes from DESetupLinux.
   Choose either or both when prompted; skip this option on headless systems.
+- **KDE Plasma configuration:** installs Oxygen and applies the selected KDE
+  appearance settings after package installation and desktop asset copying.
+  Selecting it automatically adds the Empty-Butterfly-Purple cursor theme if it
+  was not selected under Desktop Environment Items. Existing KDE configuration
+  files are backed up in `~/.dotfiles-backup/` before changes are made.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.

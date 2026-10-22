@@ -71,7 +71,7 @@ draw_screen() {
   local active="$1" item done mark color
   shift
   printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Configuring Login Shell' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Configuring Login Shell' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
       for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
@@ -264,10 +264,70 @@ installDesktopAssets() {
   rm -rf -- "$scratch"
   success 'Selected desktop assets copied; unrelated destination files were retained.'
 }
+applyKdePlasmaConfig() {
+  local backup_dir name cursor_theme_found=no
+  local -a cursor_theme_paths=(
+    "$HOME/.icons/Empty-Butterfly-Purple"
+    "$HOME/.local/share/icons/Empty-Butterfly-Purple"
+    '/usr/share/icons/Empty-Butterfly-Purple'
+  )
+
+  if ! command -v kwriteconfig6 >/dev/null 2>&1; then
+    error 'kwriteconfig6 is unavailable (requires KDE configuration utilities).'
+    return 1
+  fi
+  if ! command -v plasma-apply-colorscheme >/dev/null 2>&1; then
+    error 'plasma-apply-colorscheme is unavailable.'
+    return 1
+  fi
+
+  for name in "${cursor_theme_paths[@]}"; do
+    if [[ -d "$name" ]]; then cursor_theme_found=yes; break; fi
+  done
+  if [[ "$cursor_theme_found" != yes ]]; then
+    error 'Required Empty-Butterfly-Purple cursor theme was not found after installing Desktop Environment Items.'
+    return 1
+  fi
+
+  backup_dir="$HOME/.dotfiles-backup/kde-appearance-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
+  for name in kdeglobals kcminputrc kwinrc plasmarc; do
+    if [[ -f "$HOME/.config/$name" ]]; then
+      cp -a -- "$HOME/.config/$name" "$backup_dir/$name"
+    fi
+  done
+  info "Backed up existing KDE configuration files to $backup_dir"
+
+  # KDE application color scheme. Apply through KDE's supported helper.
+  plasma-apply-colorscheme BreezeDark
+
+  # Breeze icons, without changing individual applications' bundled icons.
+  kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
+
+  # Oxygen widgets, Plasma Style, and overall look and feel.
+  kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Oxygen
+  kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
+  kwriteconfig6 --file plasmarc --group Theme --key name oxygen
+
+  # Use wallpaper-derived accent rather than a fixed purple value.
+  kwriteconfig6 --file kdeglobals --group General --key accentColorFromWallpaper true
+
+  # Oxygen window decorations; don't modify KWin behavior or effects.
+  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.oxygen
+  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme Breeze
+
+  # Cursor theme supplied by DESetupLinux via Arch-GKuba.
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme Empty-Butterfly-Purple
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 48
+
+  printf '\n'
+  success 'KDE Plasma appearance settings written.'
+  info 'Some changes may require logging out and back in.'
+}
 
 # Wizard prompts and summary
 gatherWizardAnswers() {
-  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; SET_ZSH_SHELL=no
+  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no; SET_ZSH_SHELL=no
   WANT_WALLPAPERS=no; WANT_CURSORS=no
   local -a package_lines=()
   append_wrapped_packages package_lines "${PACMAN_CORE_PACKAGES[@]}"
@@ -288,6 +348,7 @@ gatherWizardAnswers() {
   local -a desktop_asset_lines=()
   append_wrapped_packages desktop_asset_lines 'Wallpapers' 'Cursor themes'
   wizard_panel 'Optional Desktop Environment Items' "${desktop_asset_lines[@]}"
+  info 'Desktop Environment Items are required for KDE Plasma cursor settings.'
   if ask_yes_no 'Install these desktop environment items?' "$DEFAULT_INSTALL_DESKTOP_ASSETS"; then
     INSTALL_DESKTOP_ASSETS=yes
     # Replace the yes/no question with the follow-up choice, leaving the
@@ -303,6 +364,19 @@ gatherWizardAnswers() {
         *) warn "Enter 'w', 'c', or 'b'." ;;
       esac
     done
+  fi
+
+  local -a kde_config_lines=('Oxygen style and Breeze Dark colors' 'KDE appearance configuration')
+  kde_config_lines+=('Oxygen will be added to the installed package list')
+  kde_config_lines+=('Requires the Empty-Butterfly-Purple cursor theme; it will be added')
+  wizard_panel 'KDE Plasma Configuration' "${kde_config_lines[@]}"
+  if ask_yes_no 'Install KDE Plasma configuration?' no; then
+    INSTALL_KDE_CONFIG=yes
+    if [[ "$WANT_CURSORS" != yes ]]; then
+      info 'Adding Desktop Environment Items and the required cursor theme for KDE Plasma configuration.'
+      INSTALL_DESKTOP_ASSETS=yes
+      WANT_CURSORS=yes
+    fi
   fi
   return 0
 }
@@ -328,6 +402,10 @@ showPlan() {
     [[ "$WANT_CURSORS" == yes ]] && selected_assets+=('Cursor themes')
     append_wrapped_packages lines "${selected_assets[@]}"
   fi
+  if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
+    lines+=('KDE Plasma Configuration:')
+    lines+=('  Install Oxygen and apply KDE appearance settings')
+  fi
   [[ "$SET_ZSH_SHELL" == yes ]] && lines+=('Set Zsh as the default login shell')
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
@@ -344,6 +422,12 @@ installCorePackages() {
 }
 installExtraDesktopApps() { run_group extra-desktop PACMAN_EXTRA_DESKTOP_PACKAGES; }
 installCooling() { run_group cooling PACMAN_COOLING_PACKAGES; }
+installSelectedDesktopPackages() {
+  local -a packages=()
+  [[ "$INSTALL_EXTRA" == yes ]] && packages+=("${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}")
+  [[ "$INSTALL_KDE_CONFIG" == yes ]] && packages+=(oxygen)
+  ((${#packages[@]})) && sudo pacman -S --needed --noconfirm "${packages[@]}"
+}
 
 # Main wizard
 main() {
@@ -362,7 +446,9 @@ main() {
   run_in_progress_area checkUpdates; completed+=('Updating System')
   [[ "$tty" == yes ]] && draw_screen 'Installing Pacman Packages' "${completed[@]}"
   run_in_progress_area installCorePackageGroup
-  [[ "$INSTALL_EXTRA" == yes ]] && run_in_progress_area installPackages PACMAN_EXTRA_DESKTOP_PACKAGES
+  if [[ "$INSTALL_EXTRA" == yes || "$INSTALL_KDE_CONFIG" == yes ]]; then
+    run_in_progress_area installSelectedDesktopPackages
+  fi
   [[ "$INSTALL_COOLING" == yes ]] && run_in_progress_area installPackages PACMAN_COOLING_PACKAGES
   completed+=('Installing Pacman Packages')
   if [[ "$SET_ZSH_SHELL" == yes ]]; then
@@ -386,6 +472,11 @@ main() {
   else
     completed+=('Installing Desktop Assets')
   fi
+  if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Applying KDE Plasma Config' "${completed[@]}"
+    applyKdePlasmaConfig
+  fi
+  completed+=('Applying KDE Plasma Config')
   completed+=('Applying CoolerControl Config')
   if [[ "$SET_ZSH_SHELL" == yes ]]; then
     completed+=('Configuring Login Shell')
