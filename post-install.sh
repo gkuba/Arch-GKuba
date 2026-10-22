@@ -298,8 +298,8 @@ EOF
   # Daemon mode returns only after Noctalia has initialized successfully. Keep
   # the existing Plasma panels if the startup check fails.
   info 'Starting Noctalia to verify its installation before changing Plasma panels.'
-  if ! noctalia --daemon; then
-    error 'Noctalia did not start successfully; Plasma panels were left unchanged.'
+  if ! noctalia --daemon >/dev/null 2>&1; then
+    error 'Noctalia did not start successfully; check ~/.cache/noctalia/noctalia.log. Plasma panels were left unchanged.'
     return 1
   fi
 
@@ -359,16 +359,6 @@ applyKdePlasmaConfig() {
   fi
   info "Backed up existing KDE configuration files to $backup_dir"
 
-  # KDE application color scheme. Skip the helper when the requested scheme is
-  # already selected; some Plasma versions report that as a nonzero failure.
-  local current_color_scheme
-  current_color_scheme=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)
-  if [[ "$current_color_scheme" == BreezeDark ]]; then
-    info 'BreezeDark is already selected; skipping color-scheme change.'
-  else
-    plasma-apply-colorscheme BreezeDark
-  fi
-
   # Breeze icons, without changing individual applications' bundled icons.
   kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
 
@@ -376,6 +366,18 @@ applyKdePlasmaConfig() {
   kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Oxygen
   kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
   kwriteconfig6 --file plasmarc --group Theme --key name oxygen
+
+  # Apply Breeze Dark after writing Oxygen's style/look-and-feel settings so
+  # their bundled color scheme cannot take precedence.
+  # Skip the helper when already selected; some Plasma versions return nonzero
+  # for an unchanged color scheme.
+  local current_color_scheme
+  current_color_scheme=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)
+  if [[ "$current_color_scheme" == BreezeDark ]]; then
+    info 'BreezeDark is already selected; skipping color-scheme change.'
+  else
+    plasma-apply-colorscheme BreezeDark
+  fi
 
   # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
   kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
