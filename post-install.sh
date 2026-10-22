@@ -99,8 +99,9 @@ mark_setup_complete_in_place() {
     done
     row=$((row + 1))
   done
-  # Clear the last stage's leftover text before writing the final status line.
-  printf '\033[%d;1H\033[2K' "$output_row"
+  # Clear the last stage's completion/progress rows before writing final status.
+  printf '\033[%d;1H\033[2K\033[%d;1H\033[2K\033[%d;1H' \
+    "$output_row" "$((output_row + 1))" "$output_row"
 }
 panel() {
   local title="$1" line width=68
@@ -515,7 +516,15 @@ subprocess.run([
       --group org.kde.image \
       --group General \
       --key Image \
-      "file://${login_wallpaper}"
+      "$login_wallpaper"
+    kwriteconfig6 \
+      --file kscreenlockerrc \
+      --group Greeter \
+      --group Wallpaper \
+      --group org.kde.image \
+      --group General \
+      --key PreviewImage \
+      "$login_wallpaper"
     success 'Configured the Plasma lock-screen wallpaper.'
   fi
 
@@ -610,15 +619,11 @@ showPlan() {
   fi
   if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
     lines+=('KDE Plasma Configuration:')
-    lines+=('  Install Oxygen and Ghostty; apply KDE appearance, terminal, and input settings')
-    lines+=('  Set an hourly all-screen wallpaper slideshow if wallpapers exist')
-    lines+=('  Set a random PNG for the Plasma login and lock screens if available')
+    lines+=('  Oxygen, Ghostty, theme, input, and wallpapers')
   fi
   if [[ "$INSTALL_NOCTALIA" == yes ]]; then
     lines+=('Noctalia shell for KDE:')
-    lines+=('  Install noctalia and deploy its DESetupLinux config and Violet-Noir palette')
-    lines+=('  Start and verify Noctalia, configure KDE autostart, then remove Plasma panels')
-    lines+=('  Preserve any existing Noctalia GUI overrides')
+    lines+=('  Install, configure, autostart, remove Plasma panels')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
