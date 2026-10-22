@@ -338,7 +338,7 @@ installNoctaliaShellForKde() {
 }
 applyKdePlasmaConfig() {
   local backup_dir name cursor_theme_found=no
-  local wallpaper_dir="$HOME/Pictures/Wallpapers" wallpaper_source
+  local wallpaper_dir="$HOME/Pictures/Wallpapers" wallpaper_source=''
   local -a cursor_theme_paths=(
     "$HOME/.icons/Empty-Butterfly-Purple"
     "$HOME/.local/share/icons/Empty-Butterfly-Purple"
@@ -347,6 +347,10 @@ applyKdePlasmaConfig() {
 
   if ! command -v kwriteconfig6 >/dev/null 2>&1; then
     error 'kwriteconfig6 is unavailable (requires KDE configuration utilities).'
+    return 1
+  fi
+  if ! command -v kreadconfig6 >/dev/null 2>&1; then
+    error 'kreadconfig6 is unavailable; KDE configuration cannot be verified.'
     return 1
   fi
   if ! command -v plasma-apply-colorscheme >/dev/null 2>&1; then
@@ -377,26 +381,36 @@ applyKdePlasmaConfig() {
   # Breeze icons, without changing individual applications' bundled icons.
   kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
 
-  # Oxygen widgets, Plasma Style, and overall look and feel.
+  # Oxygen application style, global theme, and Plasma style.
   kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Oxygen
   kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
   kwriteconfig6 --file plasmarc --group Theme --key name oxygen
 
-  # Apply Breeze Dark after Oxygen settings. Always invoke the Plasma helper:
-  # kdeglobals can already say BreezeDark while the active session still uses
-  # another scheme (for example after a first-time Oxygen install).
-  if ! plasma-apply-colorscheme BreezeDark; then
-    error 'Could not apply the Breeze Dark color scheme.'
-    return 1
+  # Keep the lock-screen theme Oxygen. Theme is used by
+  # older Plasma releases; LookAndFeel is used by newer Plasma 6 releases.
+  kwriteconfig6 --file kscreenlockerrc --group Greeter --key Theme org.kde.oxygen
+  kwriteconfig6 --file kscreenlockerrc --group Greeter --key LookAndFeel org.kde.oxygen
+
+  # Apply Breeze Dark after all theme settings. Some Plasma versions return a
+  # nonzero status when the requested scheme is already active.
+  local colorscheme_output
+  if ! colorscheme_output=$(plasma-apply-colorscheme BreezeDark 2>&1); then
+    if [[ "$colorscheme_output" == *'already set'* ]]; then
+      info 'Breeze Dark is already active.'
+    else
+      error "Could not apply the Breeze Dark color scheme: $colorscheme_output"
+      return 1
+    fi
   fi
 
   # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
   kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
   kwriteconfig6 --file kdeglobals --group General --key AccentColorFromWallpaper false
 
-  # Oxygen window decorations; don't modify KWin behavior or effects.
+  # Oxygen window decoration. Remove the obsolete theme key so it uses the
+  # Oxygen decoration's own defaults.
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.oxygen
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme Breeze
+  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme --delete
 
   # Cursor theme supplied by DESetupLinux via Arch-GKuba.
   kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme Empty-Butterfly-Purple
@@ -497,10 +511,14 @@ subprocess.run([
     info "Wallpaper directory not found; skipping Plasma Login Manager wallpaper setup: $wallpaper_dir"
   fi
 
-  # Reuse the installed login wallpaper for the Plasma lock screen.
-  local login_wallpaper='/var/lib/plasmalogin/wallpapers/login-wallpaper.png'
-  if [[ -f "$login_wallpaper" ]]; then
-    local login_wallpaper_url="file://${login_wallpaper}"
+  # Configure the Plasma lock screen to read the selected image from the
+  # user's wallpaper directory. The login manager uses its separate system copy.
+  if [[ -n "$wallpaper_source" ]]; then
+    if [[ ! -r "$wallpaper_source" ]]; then
+      error "The selected lock-screen wallpaper is not readable: $wallpaper_source"
+      return 1
+    fi
+    local lock_wallpaper_url="file://${wallpaper_source}"
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
@@ -513,7 +531,7 @@ subprocess.run([
       --group org.kde.image \
       --group General \
       --key Image \
-      "$login_wallpaper_url"
+      "$lock_wallpaper_url"
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
@@ -521,8 +539,22 @@ subprocess.run([
       --group org.kde.image \
       --group General \
       --key PreviewImage \
-      "$login_wallpaper_url"
-    success 'Configured the Plasma lock-screen wallpaper.'
+      "$lock_wallpaper_url"
+
+    local configured_lock_wallpaper configured_lock_plugin
+    configured_lock_plugin=$(kreadconfig6 --file kscreenlockerrc \
+      --group Greeter --key WallpaperPlugin)
+    configured_lock_wallpaper=$(kreadconfig6 --file kscreenlockerrc \
+      --group Greeter --group Wallpaper --group org.kde.image \
+      --group General --key Image)
+    if [[ "$configured_lock_plugin" != org.kde.image || \
+      "$configured_lock_wallpaper" != "$lock_wallpaper_url" ]]; then
+      error 'Plasma lock-screen wallpaper settings did not persist to kscreenlockerrc.'
+      info "Expected plugin: org.kde.image; image: $lock_wallpaper_url"
+      info "Read back plugin: ${configured_lock_plugin:-<empty>}; image: ${configured_lock_wallpaper:-<empty>}"
+      return 1
+    fi
+    success 'Verified the Plasma lock-screen wallpaper settings and image file.'
   fi
 
   printf '\n'
