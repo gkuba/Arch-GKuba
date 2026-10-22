@@ -66,9 +66,15 @@ assert_prerequisites() {
   [[ -r /etc/arch-release ]] || { error 'Arch-based systems only.'; return 1; }
 }
 draw_screen() {
-  local active="$1" item done mark color
+  local active="$1" item done mark color title='Arch Post-Install Script' width=68 left_pad right_pad
   shift
-  printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
+  left_pad=$(((width - ${#title}) / 2))
+  right_pad=$((width - ${#title} - left_pad))
+  printf '\033[H\033[2J%s%s╭' "$MAGENTA" "$BOLD"
+  printf '─%.0s' $(seq 1 "$width")
+  printf '╮%s\n│%*s%s%*s│\n╰' "$RESET" "$left_pad" '' "$title" "$right_pad" ''
+  printf '─%.0s' $(seq 1 "$width")
+  printf '╯%s\n\n' "$RESET"
   for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
