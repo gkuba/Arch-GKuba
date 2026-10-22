@@ -385,7 +385,7 @@ main() {
   completed+=('Installing Pacman Packages')
   if [[ "$INSTALL_COOLING" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing AUR Packages' "${completed[@]}"
-    installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
+    run_in_progress_area installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
     [[ "$tty" == yes ]] && draw_screen 'Applying CoolerControl Config' "${completed[@]}"
     applyCoolerControlConfig
   else
