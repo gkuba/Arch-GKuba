@@ -77,6 +77,20 @@ draw_screen() {
   done
   printf '\n'
 }
+mark_setup_complete_in_place() {
+  local item done row=5 output_row=13
+  is_tty || return 0
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
+    for done in "$@"; do
+      if [[ "$item" == "$done" ]]; then
+        printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
+        break
+      fi
+    done
+    row=$((row + 1))
+  done
+  printf '\033[%d;1H' "$output_row"
+}
 panel() {
   local title="$1" line width=68
   shift
@@ -123,7 +137,7 @@ spinner() {
   if wait "$pid"; then rc=0; else rc=$?; fi
   printf '\r\033[K'; return "$rc"
 }
-on_error() { local rc=$? line=${1:-?}; is_tty && printf '\033[r\033[?25h\n'; error "Stopped at line $line (exit $rc). See the preceding error."; exit "$rc"; }
+on_error() { local rc=$? line=${1:-?}; is_tty && printf '\033[?25h\n'; error "Stopped at line $line (exit $rc). See the preceding error."; exit "$rc"; }
 trap 'on_error $LINENO' ERR
 
 # Internal workflow helpers
@@ -137,7 +151,7 @@ run_in_progress_area() {
   "$@" || rc=$?
   # Keep pacman/sudo diagnostics visible if a stage fails. On success the next
   # draw_screen refreshes the display before beginning the following stage.
-  printf '\033[r'
+  printf '\033[s\033[r\033[u'
   return "$rc"
 }
 installPackages() { local -n group="$1"; ((${#group[@]})) && sudo pacman -S --needed --noconfirm "${group[@]}"; }
@@ -243,7 +257,7 @@ applyKdePlasmaConfig() {
 
   backup_dir="$HOME/.dotfiles-backup/kde-appearance-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$backup_dir"
-  for name in kdeglobals kcminputrc kwinrc plasmarc; do
+  for name in kdeglobals kcminputrc kwinrc plasmarc kglobalshortcutsrc plasma-org.kde.plasma.desktop-appletsrc; do
     if [[ -f "$HOME/.config/$name" ]]; then
       cp -a -- "$HOME/.config/$name" "$backup_dir/$name"
     fi
@@ -272,8 +286,73 @@ applyKdePlasmaConfig() {
   kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme Empty-Butterfly-Purple
   kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 48
 
+  # Use Ghostty as KDE's terminal and move the terminal shortcuts from Konsole.
+  kwriteconfig6 --file kglobalshortcutsrc \
+    --group services \
+    --group org.kde.konsole.desktop \
+    --key _launch none
+  kwriteconfig6 --file kdeglobals \
+    --group General \
+    --key TerminalApplication ghostty
+  kwriteconfig6 --file kdeglobals \
+    --group General \
+    --key TerminalService com.mitchellh.ghostty.desktop
+  kwriteconfig6 --file kglobalshortcutsrc \
+    --group services \
+    --group com.mitchellh.ghostty.desktop \
+    --key _launch $'Meta+X\tCtrl+Alt+T'
+
+  # Allow legacy X11 applications to receive mouse-button events for PTT.
+  kwriteconfig6 --file kwinrc \
+    --group Xwayland \
+    --key XwaylandEavesdropsMouse true
+
+  # Turn Num Lock on when Plasma starts.
+  kwriteconfig6 --file kcminputrc \
+    --group Keyboard \
+    --key NumLock 0
+
+  # Configure an hourly slideshow on every screen when wallpaper assets exist.
+  local wallpaper_dir="$HOME/Pictures/Wallpapers"
+  if [[ -d "$wallpaper_dir" ]]; then
+    require_commands python3 dbus-send || return 1
+    WALLPAPER_DIR="$wallpaper_dir" python3 -c '
+import json, os, subprocess
+
+folder = os.environ["WALLPAPER_DIR"]
+script = """
+var screens = desktops();
+for (var i = 0; i < screens.length; i++) {
+    var desktop = screens[i];
+    desktop.wallpaperPlugin = "org.kde.slideshow";
+    desktop.currentConfigGroup = ["Wallpaper", "org.kde.slideshow", "General"];
+    desktop.writeConfig("SlidePaths", [FOLDER]);
+    desktop.writeConfig("SlideInterval", 3600);
+    desktop.writeConfig("SlideshowMode", 1);
+    desktop.writeConfig("SlideshowFoldersFirst", false);
+    desktop.writeConfig("UncheckedSlides", []);
+    desktop.writeConfig("FillMode", 2);
+    desktop.writeConfig("DynamicMode", 0);
+    desktop.reloadConfig();
+}
+""".replace("FOLDER", json.dumps(folder))
+
+subprocess.run([
+    "dbus-send", "--session",
+    "--dest=org.kde.plasmashell",
+    "--type=method_call",
+    "/PlasmaShell",
+    "org.kde.PlasmaShell.evaluateScript",
+    "string:" + script
+], check=True)
+'
+    success 'Configured the hourly Plasma wallpaper slideshow on all screens.'
+  else
+    info "Wallpaper directory not found; skipping slideshow setup: $wallpaper_dir"
+  fi
+
   printf '\n'
-  success 'KDE Plasma appearance settings written.'
+  success 'KDE Plasma appearance, terminal, input, and wallpaper settings written.'
   info 'Some changes may require logging out and back in.'
 }
 
@@ -314,8 +393,13 @@ gatherWizardAnswers() {
     done
   fi
 
-  local -a kde_config_lines=('Oxygen style and Breeze Dark colors' 'KDE appearance configuration')
+  local -a kde_config_lines=('Oxygen style and Breeze Dark colors' 'Set Ghostty as the default terminal')
+  kde_config_lines+=('Bind Super+X and Ctrl+Alt+T to Ghostty')
+  kde_config_lines+=('Allow X11 apps to receive mouse-button events for PTT')
+  kde_config_lines+=('Turn Num Lock on when Plasma starts')
+  kde_config_lines+=('Set an hourly slideshow on all screens if wallpapers exist')
   kde_config_lines+=('Oxygen will be added to the installed package list')
+  kde_config_lines+=('Ghostty will be added if Extra Desktop Apps is not selected')
   kde_config_lines+=('Requires the Empty-Butterfly-Purple cursor theme; it will be added')
   wizard_panel 'KDE Plasma Configuration' "${kde_config_lines[@]}"
   if ask_yes_no 'Install KDE Plasma configuration?' no; then
@@ -350,7 +434,8 @@ showPlan() {
   fi
   if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
     lines+=('KDE Plasma Configuration:')
-    lines+=('  Install Oxygen and apply KDE appearance settings')
+    lines+=('  Install Oxygen and Ghostty; apply KDE appearance, terminal, and input settings')
+    lines+=('  Set an hourly all-screen wallpaper slideshow if wallpapers exist')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
@@ -361,7 +446,10 @@ installCooling() { run_group cooling PACMAN_COOLING_PACKAGES; }
 installSelectedDesktopPackages() {
   local -a packages=()
   [[ "$INSTALL_EXTRA" == yes ]] && packages+=("${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}")
-  [[ "$INSTALL_KDE_CONFIG" == yes ]] && packages+=(oxygen)
+  if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
+    packages+=(oxygen)
+    [[ "$INSTALL_EXTRA" == yes ]] || packages+=(ghostty)
+  fi
   ((${#packages[@]})) && sudo pacman -S --needed --noconfirm "${packages[@]}"
 }
 
@@ -387,23 +475,23 @@ main() {
     [[ "$tty" == yes ]] && draw_screen 'Installing AUR Packages' "${completed[@]}"
     run_in_progress_area installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
     [[ "$tty" == yes ]] && draw_screen 'Applying CoolerControl Config' "${completed[@]}"
-    applyCoolerControlConfig
+    run_in_progress_area applyCoolerControlConfig
   else
     completed+=('Installing AUR Packages' 'Applying CoolerControl Config')
   fi
   if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing Desktop Assets' "${completed[@]}"
-    installDesktopAssets
+    run_in_progress_area installDesktopAssets
     completed+=('Installing Desktop Assets')
   else
     completed+=('Installing Desktop Assets')
   fi
   if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Applying KDE Plasma Config' "${completed[@]}"
-    applyKdePlasmaConfig
+    run_in_progress_area applyKdePlasmaConfig
   fi
-  completed+=('Applying KDE Plasma Config')
-  completed+=('Applying CoolerControl Config')
+  completed+=('Applying KDE Plasma Config' 'Applying CoolerControl Config' 'Finalizing')
+  mark_setup_complete_in_place "${completed[@]}"
   success 'Post-installation sequence completed successfully.'
 }
 
