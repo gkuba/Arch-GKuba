@@ -13,12 +13,10 @@ DIM=$'\033[2m'
 RESET=$'\033[0m'
 
 # Package groups (manager-specific to support future distro mappings)
-PACMAN_CORE_PACKAGES=(git curl unzip 7zip neovim fastfetch fzf ttf-fira-code zsh starship)
 PACMAN_EXTRA_DESKTOP_PACKAGES=(discord ghostty obsidian vivaldi spotify-launcher solaar)
 PACMAN_COOLING_PACKAGES=(coolercontrol coolercontrold liquidctl)
 AUR_COOLING_PACKAGES=(nct6687d-dkms-git)
 DESETUP_REPO='https://github.com/gkuba/DESetupLinux.git'
-STARSHIP_FALLBACK_INSTALLER='https://starship.rs/install.sh'
 COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
 DEFAULT_INSTALL_EXTRA=no
 DEFAULT_INSTALL_COOLING=no
@@ -28,12 +26,11 @@ DEFAULT_INSTALL_DESKTOP_ASSETS=no
 usage() {
   cat <<EOF
 Arch Post-Install Script
-Usage: $(basename "$0") [installCorePackages|installExtraDesktopApps|installCooling|installDesktopAssets|--help]
+Usage: $(basename "$0") [installExtraDesktopApps|installCooling|installDesktopAssets|--help]
 
 No argument runs the interactive wizard. Each install action runs only its
 package group, after a system update. Run as your user; sudo is requested as needed.
 
-  installCorePackages       Install core packages and configure the Zsh login shell
   installExtraDesktopApps   Install optional desktop applications
   installCooling            Install CoolerControl and MSI sensor support
   installDesktopAssets      Copy selected wallpapers and/or cursor themes
@@ -71,7 +68,7 @@ draw_screen() {
   local active="$1" item done mark color
   shift
   printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Configuring Login Shell' 'Ensuring Paru' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
       for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
@@ -144,59 +141,6 @@ run_in_progress_area() {
   return "$rc"
 }
 installPackages() { local -n group="$1"; ((${#group[@]})) && sudo pacman -S --needed --noconfirm "${group[@]}"; }
-installCorePackageGroup() {
-  local -n group=PACMAN_CORE_PACKAGES
-  local package starship_available=yes
-  local -a pacman_packages=()
-  for package in "${group[@]}"; do
-    if [[ "$package" == starship ]] && ! pacman -Si starship >/dev/null 2>&1; then
-      starship_available=no
-      info 'Starship is not available in the configured pacman repositories; using its installer as a fallback.'
-    else
-      pacman_packages+=("$package")
-    fi
-  done
-  if ((${#pacman_packages[@]})); then sudo pacman -S --needed --noconfirm "${pacman_packages[@]}"; fi
-  if [[ "$starship_available" == no ]]; then
-    local installer install_status
-    if command -v starship >/dev/null 2>&1; then
-      success 'Starship is already available; keeping the existing installation.'
-      return 0
-    fi
-    installer=$(mktemp "${TMPDIR:-/tmp}/starship-install.XXXXXXXX")
-    if ! curl -fsSL "$STARSHIP_FALLBACK_INSTALLER" -o "$installer"; then
-      rm -f -- "$installer"
-      error 'Could not download the Starship fallback installer.'
-      return 1
-    fi
-    if sh "$installer" -y; then
-      install_status=0
-    else
-      install_status=$?
-    fi
-    rm -f -- "$installer"
-    ((install_status == 0)) || return "$install_status"
-  fi
-}
-loginShellIsZsh() {
-  local user shell_path
-  user=$(id -un)
-  shell_path=$(getent passwd "$user" | cut -d: -f7)
-  [[ "${shell_path##*/}" == zsh ]]
-}
-setZshLoginShell() {
-  local user zsh_path current_shell
-  user=$(id -un)
-  zsh_path=$(command -v zsh) || { error 'Zsh was not found after installing the core packages.'; return 1; }
-  [[ -x "$zsh_path" ]] || { error "Detected Zsh path is not executable: $zsh_path"; return 1; }
-  current_shell=$(getent passwd "$user" | cut -d: -f7)
-  if [[ "$current_shell" == "$zsh_path" ]]; then success 'Zsh is already the default login shell.'; return 0; fi
-  info "Setting the login shell for $user to $zsh_path."
-  sudo usermod --shell "$zsh_path" "$user"
-  current_shell=$(getent passwd "$user" | cut -d: -f7)
-  [[ "$current_shell" == "$zsh_path" ]] || { error 'The account database did not report the Zsh shell change.'; return 1; }
-  success "Default login shell set to $zsh_path. Log out and back in for it to take effect."
-}
 ensureParu() {
   command -v paru >/dev/null 2>&1 && { success 'paru is already installed.'; return; }
   info 'Installing paru from the configured pacman repositories.'
@@ -204,7 +148,11 @@ ensureParu() {
   command -v paru >/dev/null 2>&1 || { error 'paru installation did not complete.'; return 1; }
   success 'paru is ready.'
 }
-installAurPackages() { ((${#@})) || return 0; ensureParu; paru -S --needed --noconfirm "$@"; }
+installAurPackages() {
+  ((${#@})) || return 0
+  ensureParu || return 1
+  paru -S --needed --noconfirm "$@"
+}
 applyCoolerControlConfig() {
   local tmp backup
   tmp=$(mktemp "${TMPDIR:-/tmp}/coolercontrol.XXXXXXXX")
@@ -232,7 +180,7 @@ run_group() {
   success "$name package group complete."
 }
 installDesktopAssets() {
-  local scratch choice
+  local scratch choice wallpaper
   if [[ "${WANT_WALLPAPERS:-no}" != yes && "${WANT_CURSORS:-no}" != yes ]]; then
     while true; do
       read -r -p 'Choose [w]allpapers, [c]ursor themes, or [b]oth: ' choice || return 1
@@ -254,7 +202,11 @@ installDesktopAssets() {
   if [[ "$WANT_WALLPAPERS" == yes ]]; then
     [[ -d "$scratch/DESetupLinux/Wallpapers" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux Wallpapers directory not found.'; return 1; }
     mkdir -p "$HOME/Pictures/Wallpapers"
-    cp -a "$scratch/DESetupLinux/Wallpapers/." "$HOME/Pictures/Wallpapers/"
+    for wallpaper in "$scratch/DESetupLinux/Wallpapers"/* "$scratch/DESetupLinux/Wallpapers"/.[!.]* "$scratch/DESetupLinux/Wallpapers"/..?*; do
+      [[ -e "$wallpaper" || -L "$wallpaper" ]] || continue
+      [[ "${wallpaper##*/}" == Archive ]] && continue
+      cp -a -- "$wallpaper" "$HOME/Pictures/Wallpapers/"
+    done
   fi
   if [[ "$WANT_CURSORS" == yes ]]; then
     [[ -d "$scratch/DESetupLinux/.icons" ]] || { rm -rf -- "$scratch"; error 'DESetupLinux .icons directory not found.'; return 1; }
@@ -327,13 +279,9 @@ applyKdePlasmaConfig() {
 
 # Wizard prompts and summary
 gatherWizardAnswers() {
-  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no; SET_ZSH_SHELL=no
+  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no
   WANT_WALLPAPERS=no; WANT_CURSORS=no
   local -a package_lines=()
-  append_wrapped_packages package_lines "${PACMAN_CORE_PACKAGES[@]}"
-  wizard_panel 'Core packages (always included)' "${package_lines[@]}"
-  if ! loginShellIsZsh && ask_yes_no 'Make Zsh the default login shell after installation?' yes; then SET_ZSH_SHELL=yes; fi
-  package_lines=()
   append_wrapped_packages package_lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
   wizard_panel 'Extra Desktop Apps' "${package_lines[@]}"
   if ask_yes_no 'Install these extra desktop applications?' "$DEFAULT_INSTALL_EXTRA"; then INSTALL_EXTRA=yes; fi
@@ -382,8 +330,6 @@ gatherWizardAnswers() {
 }
 showPlan() {
   local -a lines=('Update system')
-  lines+=('Core packages:')
-  append_wrapped_packages lines "${PACMAN_CORE_PACKAGES[@]}"
   if [[ "$INSTALL_EXTRA" == yes ]]; then
     lines+=('Extra Desktop Apps:')
     append_wrapped_packages lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
@@ -406,20 +352,10 @@ showPlan() {
     lines+=('KDE Plasma Configuration:')
     lines+=('  Install Oxygen and apply KDE appearance settings')
   fi
-  [[ "$SET_ZSH_SHELL" == yes ]] && lines+=('Set Zsh as the default login shell')
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
 
 # Public actions (the only accepted function arguments)
-installCorePackages() {
-  assert_prerequisites
-  local set_shell=no
-  if ! loginShellIsZsh && ask_yes_no 'Make Zsh the default login shell after installation?' yes; then set_shell=yes; fi
-  checkUpdates
-  installCorePackageGroup
-  if [[ "$set_shell" == yes ]]; then setZshLoginShell; fi
-  success 'core package group complete.'
-}
 installExtraDesktopApps() { run_group extra-desktop PACMAN_EXTRA_DESKTOP_PACKAGES; }
 installCooling() { run_group cooling PACMAN_COOLING_PACKAGES; }
 installSelectedDesktopPackages() {
@@ -436,27 +372,17 @@ main() {
   [[ "$tty" == yes ]] && draw_screen 'Gathering Information' || printf 'Arch Post-Install Script\n\n'
   gatherWizardAnswers
   local -a completed=('Gathering Information')
-  # The shell stage is already satisfied when Zsh was the login shell before
-  # the wizard began, even though no shell change was needed.
-  loginShellIsZsh && completed+=('Configuring Login Shell')
   [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
   showPlan
   confirm_plan || { info 'Setup cancelled; no changes were made.'; return 0; }
   [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
   run_in_progress_area checkUpdates; completed+=('Updating System')
   [[ "$tty" == yes ]] && draw_screen 'Installing Pacman Packages' "${completed[@]}"
-  run_in_progress_area installCorePackageGroup
   if [[ "$INSTALL_EXTRA" == yes || "$INSTALL_KDE_CONFIG" == yes ]]; then
     run_in_progress_area installSelectedDesktopPackages
   fi
   [[ "$INSTALL_COOLING" == yes ]] && run_in_progress_area installPackages PACMAN_COOLING_PACKAGES
   completed+=('Installing Pacman Packages')
-  if [[ "$SET_ZSH_SHELL" == yes ]]; then
-    [[ "$tty" == yes ]] && draw_screen 'Configuring Login Shell' "${completed[@]}"
-    setZshLoginShell
-  fi
-  [[ "$tty" == yes ]] && draw_screen 'Ensuring Paru' "${completed[@]}"
-  ensureParu; completed+=('Ensuring Paru')
   if [[ "$INSTALL_COOLING" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing AUR Packages' "${completed[@]}"
     installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
@@ -478,12 +404,7 @@ main() {
   fi
   completed+=('Applying KDE Plasma Config')
   completed+=('Applying CoolerControl Config')
-  if [[ "$SET_ZSH_SHELL" == yes ]]; then
-    completed+=('Configuring Login Shell')
-    [[ "$tty" == yes ]] && draw_screen 'Finalizing' "${completed[@]}"
-  fi
   [[ "$tty" == yes ]] && draw_screen 'Finalizing' "${completed[@]}"
-  command -v fc-cache >/dev/null 2>&1 && spinner 'Refreshing font cache' fc-cache -f
   success 'Post-installation sequence completed successfully.'
 }
 
@@ -491,7 +412,7 @@ main() {
 if (($# == 0)); then main; else
   case "$1" in
     --help|-h) usage ;;
-    installCorePackages|installExtraDesktopApps|installCooling|installDesktopAssets) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
+    installExtraDesktopApps|installCooling|installDesktopAssets) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi

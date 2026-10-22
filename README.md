@@ -21,8 +21,7 @@ To download and run the current script directly from a Bash-compatible terminal:
 bash <(curl -fsSL https://raw.githubusercontent.com/gkuba/Arch-GKuba/main/post-install.sh)
 ```
 
-The wizard always includes the core packages. It then offers these optional
-selections:
+The wizard offers these optional selections:
 
 - **Extra Desktop Apps:** Discord, Ghostty, Obsidian, Vivaldi,
   Spotify Launcher, and Solaar.
@@ -40,14 +39,18 @@ selections:
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.
-After approval, package manager confirmation prompts are skipped. The script
-also ensures `paru` is installed through pacman and refreshes the font cache.
+After approval, package manager confirmation prompts are skipped. `paru` is
+installed from configured pacman repositories only when CoolerControl's AUR
+sensor driver is selected. CachyOS provides it in its configured repositories;
+on stock Arch, install `paru` first because this script does not bootstrap an
+AUR helper. Font cache refresh is handled by the dotfiles setup when it installs
+Fira Code.
 
-The core packages include Zsh and Starship. If Zsh is not already the login
-shell, the wizard asks whether to set it as the default and verifies the change.
-Starship is installed from pacman when available, with its upstream installer
-retained as a fallback. The script does not clone or build paru from an
-external repository.
+Shell tools and the optional Zsh login-shell change are handled by the
+[dotfiles setup](https://github.com/gkuba/dotfiles), which supports both Arch
+and Debian-family systems. This post-install script does not install Neovim,
+Fira Code, or the dotfiles-managed shell tools: Zsh, Starship, fzf, eza,
+Fastfetch, Git, curl, 7zip, unzip, and iproute2.
 
 ## Run an action directly
 
@@ -58,7 +61,6 @@ both, then copies them into the matching user directories without removing
 unrelated files. This action does not update packages.
 
 ```bash
-./post-install.sh installCorePackages
 ./post-install.sh installExtraDesktopApps
 ./post-install.sh installCooling
 ./post-install.sh installDesktopAssets
@@ -75,13 +77,12 @@ Show usage with:
 The lower-level package and system helpers are internal implementation details
 and are not supported command-line actions.
 
-## Core packages
+## Package ownership
 
-Git, curl, unzip, 7zip, Neovim, Fastfetch, fzf, Fira Code, Zsh, and Starship.
-
-Package lists are kept near the top of `post-install.sh`, grouped by package
-manager. The script currently maps the groups to pacman and the MSI sensor
-package to the AUR.
+Neovim, Fira Code, and shell tools are installed by the separate dotfiles
+setup. Optional desktop and cooling packages are listed near the top of
+`post-install.sh`; the MSI sensor driver is installed from the AUR only when
+CoolerControl is selected.
 
 ## Dotfiles
 
