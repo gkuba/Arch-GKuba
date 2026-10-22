@@ -27,14 +27,16 @@ DEFAULT_INSTALL_DESKTOP_ASSETS=no
 usage() {
   cat <<EOF
 Arch Post-Install Script
-Usage: $(basename "$0") [installExtraDesktopApps|installCooling|installDesktopAssets|--help]
+Usage: $(basename "$0") [installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|--help]
 
-No argument runs the interactive wizard. Each install action runs only its
-package group, after a system update. Run as your user; sudo is requested as needed.
+No argument runs the interactive wizard. Direct actions run only the selected
+task; package actions update the system first. Run as your user; sudo is
+requested as needed.
 
   installExtraDesktopApps   Install optional desktop applications
   installCooling            Install CoolerControl and MSI sensor support
   installDesktopAssets      Copy selected wallpapers and/or cursor themes
+  installNoctaliaShellForKde Install and configure Noctalia in the active KDE session
 EOF
 }
 
@@ -239,7 +241,7 @@ installDesktopAssets() {
   rm -rf -- "$scratch"
   success 'Selected desktop assets copied; unrelated destination files were retained.'
 }
-installNoctaliaShellForKde() {
+configureNoctaliaShellForKde() {
   local scratch staged_config staged_palette config_target palette_target override_file autostart_target backup_dir
   local has_override=no
 
@@ -327,6 +329,11 @@ EOF
     warn "Existing Noctalia GUI overrides were preserved and may take precedence; backup: $backup_dir/settings.toml"
   fi
   success 'Noctalia installed, started, configured to autostart, and Plasma panels removed.'
+}
+installNoctaliaShellForKde() {
+  assert_prerequisites
+  checkUpdates
+  configureNoctaliaShellForKde
 }
 applyKdePlasmaConfig() {
   local backup_dir name cursor_theme_found=no
@@ -669,7 +676,7 @@ main() {
   completed+=('Applying KDE Plasma Config')
   if [[ "$INSTALL_NOCTALIA" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing Noctalia shell for KDE' "${completed[@]}"
-    run_in_progress_area installNoctaliaShellForKde
+    run_in_progress_area configureNoctaliaShellForKde
   fi
   completed+=('Installing Noctalia shell for KDE' 'Applying CoolerControl Config' 'Finalizing')
   mark_setup_complete_in_place "${completed[@]}"
@@ -680,7 +687,7 @@ main() {
 if (($# == 0)); then main; else
   case "$1" in
     --help|-h) usage ;;
-    installExtraDesktopApps|installCooling|installDesktopAssets) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
+    installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi

@@ -68,16 +68,20 @@ Fastfetch, Git, curl, 7zip, unzip, and iproute2.
 
 ## Run an action directly
 
-Each package action updates the system and installs its named group. The
-cooling action also installs the AUR sensor driver and applies the CoolerControl
-profile. `installDesktopAssets` prompts you to choose wallpapers, cursors, or
-both, then copies them into the matching user directories without removing
-unrelated files. This action does not update packages.
+Package actions update the system before installing their selected packages.
+The cooling action also installs the AUR sensor driver and applies the
+CoolerControl profile. `installDesktopAssets` prompts you to choose wallpapers,
+cursors, or both, then copies them into the matching user directories without
+removing unrelated files; it does not update packages. The Noctalia action must
+run inside the active KDE Plasma session: it starts Noctalia to verify setup,
+creates its autostart entry, and removes Plasma panels while preserving desktop
+containments.
 
 ```bash
 ./post-install.sh installExtraDesktopApps
 ./post-install.sh installCooling
 ./post-install.sh installDesktopAssets
+./post-install.sh installNoctaliaShellForKde
 ```
 
 Run the script without an action to use the full interactive wizard.
