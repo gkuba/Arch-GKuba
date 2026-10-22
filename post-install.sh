@@ -382,16 +382,12 @@ applyKdePlasmaConfig() {
   kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
   kwriteconfig6 --file plasmarc --group Theme --key name oxygen
 
-  # Apply Breeze Dark after writing Oxygen's style/look-and-feel settings so
-  # their bundled color scheme cannot take precedence.
-  # Skip the helper when already selected; some Plasma versions return nonzero
-  # for an unchanged color scheme.
-  local current_color_scheme
-  current_color_scheme=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)
-  if [[ "$current_color_scheme" == BreezeDark ]]; then
-    info 'BreezeDark is already selected; skipping color-scheme change.'
-  else
-    plasma-apply-colorscheme BreezeDark
+  # Apply Breeze Dark after Oxygen settings. Always invoke the Plasma helper:
+  # kdeglobals can already say BreezeDark while the active session still uses
+  # another scheme (for example after a first-time Oxygen install).
+  if ! plasma-apply-colorscheme BreezeDark; then
+    error 'Could not apply the Breeze Dark color scheme.'
+    return 1
   fi
 
   # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
