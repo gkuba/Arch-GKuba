@@ -57,14 +57,7 @@ After approval, package manager confirmation prompts are skipped. `paru` is
 installed from configured pacman repositories only when CoolerControl's AUR
 sensor driver is selected. CachyOS provides it in its configured repositories;
 on stock Arch, install `paru` first because this script does not bootstrap an
-AUR helper. Font cache refresh is handled by the dotfiles setup when it installs
-Fira Code.
-
-Shell tools and the optional Zsh login-shell change are handled by the
-[dotfiles setup](https://github.com/gkuba/dotfiles), which supports both Arch
-and Debian-family systems. This post-install script does not install Neovim,
-Fira Code, or the dotfiles-managed shell tools: Zsh, Starship, fzf, eza,
-Fastfetch, Git, curl, 7zip, unzip, and iproute2.
+AUR helper.
 
 ## Run an action directly
 
@@ -94,16 +87,3 @@ Show usage with:
 
 The lower-level package and system helpers are internal implementation details
 and are not supported command-line actions.
-
-## Package ownership
-
-Neovim, Fira Code, and shell tools are installed by the separate dotfiles
-setup. Optional desktop and cooling packages are listed near the top of
-`post-install.sh`; the MSI sensor driver is installed from the AUR only when
-CoolerControl is selected.
-
-## Dotfiles
-
-The separate dotfiles repository and setup script are available at
-[github.com/gkuba/dotfiles](https://github.com/gkuba/dotfiles). Local hosts-file
-entries are managed by that dotfiles setup, not by this post-install script.
