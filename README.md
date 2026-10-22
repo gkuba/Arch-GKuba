@@ -35,8 +35,9 @@ The wizard offers these optional selections:
   appearance settings, sets Ghostty as the default terminal, and binds Super+X and
   Ctrl+Alt+T to Ghostty. It also allows legacy X11 apps to receive mouse-button
   events for PTT, enables Num Lock when Plasma starts, and configures an hourly
-  all-screen wallpaper slideshow when `~/Pictures/Wallpapers` exists. These settings
-  are applied after package installation and desktop asset copying.
+  all-screen wallpaper slideshow when `~/Pictures/Wallpapers` exists. When that
+  folder contains PNGs, it also selects one at random for Plasma Login Manager.
+  These settings are applied after package installation and desktop asset copying.
   Selecting it automatically adds the Empty-Butterfly-Purple cursor theme if it
   was not selected under Desktop Environment Items. Existing KDE configuration
   files are backed up in `~/.dotfiles-backup/` before changes are made.

@@ -233,6 +233,7 @@ installDesktopAssets() {
 }
 applyKdePlasmaConfig() {
   local backup_dir name cursor_theme_found=no
+  local wallpaper_dir="$HOME/Pictures/Wallpapers" wallpaper_source
   local -a cursor_theme_paths=(
     "$HOME/.icons/Empty-Butterfly-Purple"
     "$HOME/.local/share/icons/Empty-Butterfly-Purple"
@@ -263,6 +264,9 @@ applyKdePlasmaConfig() {
       cp -a -- "$HOME/.config/$name" "$backup_dir/$name"
     fi
   done
+  if [[ -r /etc/plasmalogin.conf ]]; then
+    cp -a -- /etc/plasmalogin.conf "$backup_dir/plasmalogin.conf"
+  fi
   info "Backed up existing KDE configuration files to $backup_dir"
 
   # KDE application color scheme. Skip the helper when the requested scheme is
@@ -321,7 +325,6 @@ applyKdePlasmaConfig() {
     --key NumLock 0
 
   # Configure an hourly slideshow on every screen when wallpaper assets exist.
-  local wallpaper_dir="$HOME/Pictures/Wallpapers"
   if [[ -d "$wallpaper_dir" ]]; then
     local required_command
     for required_command in python3 dbus-send; do
@@ -363,6 +366,31 @@ subprocess.run([
     success 'Configured the hourly Plasma wallpaper slideshow on all screens.'
   else
     info "Wallpaper directory not found; skipping slideshow setup: $wallpaper_dir"
+  fi
+
+  # Choose a PNG wallpaper for Plasma Login Manager when one is available.
+  if [[ -d "$wallpaper_dir" ]]; then
+    wallpaper_source=$(find "$wallpaper_dir" -maxdepth 1 -type f -iname '*.png' | shuf -n 1)
+    if [[ -n "$wallpaper_source" ]]; then
+      sudo install -d -m 755 /var/lib/plasmalogin/wallpapers
+      sudo install -m 644 "$wallpaper_source" \
+        /var/lib/plasmalogin/wallpapers/login-wallpaper.png
+
+      sudo kwriteconfig6 --file /etc/plasmalogin.conf \
+        --group Greeter \
+        --key WallpaperPluginId org.kde.image
+      sudo kwriteconfig6 --file /etc/plasmalogin.conf \
+        --group Greeter \
+        --group Wallpaper \
+        --group org.kde.image \
+        --group General \
+        --key Image 'file:///var/lib/plasmalogin/wallpapers/login-wallpaper.png'
+      success 'Configured a random PNG wallpaper for Plasma Login Manager.'
+    else
+      info "No PNG wallpapers found; skipping Plasma Login Manager wallpaper setup."
+    fi
+  else
+    info "Wallpaper directory not found; skipping Plasma Login Manager wallpaper setup: $wallpaper_dir"
   fi
 
   printf '\n'
@@ -412,6 +440,7 @@ gatherWizardAnswers() {
   kde_config_lines+=('Allow X11 apps to receive mouse-button events for PTT')
   kde_config_lines+=('Turn Num Lock on when Plasma starts')
   kde_config_lines+=('Set an hourly slideshow on all screens if wallpapers exist')
+  kde_config_lines+=('Set a random PNG as the Plasma Login Manager wallpaper if available')
   kde_config_lines+=('Oxygen will be added to the installed package list')
   kde_config_lines+=('Ghostty will be added if Extra Desktop Apps is not selected')
   kde_config_lines+=('Requires the Empty-Butterfly-Purple cursor theme; it will be added')
@@ -450,6 +479,7 @@ showPlan() {
     lines+=('KDE Plasma Configuration:')
     lines+=('  Install Oxygen and Ghostty; apply KDE appearance, terminal, and input settings')
     lines+=('  Set an hourly all-screen wallpaper slideshow if wallpapers exist')
+    lines+=('  Set a random PNG login wallpaper if one is available')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
