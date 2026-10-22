@@ -589,10 +589,10 @@ gatherWizardAnswers() {
     fi
   fi
 
-  local -a noctalia_lines=('Install noctalia and deploy its DESetupLinux config and Violet-Noir palette')
-  noctalia_lines+=('Start and verify Noctalia, then remove Plasma panels')
-  noctalia_lines+=('Create KDE autostart entry for noctalia --daemon')
-  noctalia_lines+=('Existing GUI settings are backed up and left in place')
+  local -a noctalia_lines=('Install Noctalia with Violet-Noir config')
+  noctalia_lines+=('Autostart on KDE login')
+  noctalia_lines+=('Remove Plasma panels')
+  noctalia_lines+=('Preserve existing GUI overrides')
   wizard_panel 'Noctalia shell for KDE' "${noctalia_lines[@]}"
   if ask_yes_no 'Install Noctalia shell for KDE?' no; then INSTALL_NOCTALIA=yes; fi
   return 0
