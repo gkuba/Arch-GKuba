@@ -89,7 +89,8 @@ mark_setup_complete_in_place() {
     done
     row=$((row + 1))
   done
-  printf '\033[%d;1H' "$output_row"
+  # Clear the last stage's leftover text before writing the final status line.
+  printf '\033[%d;1H\033[2K' "$output_row"
 }
 panel() {
   local title="$1" line width=68
