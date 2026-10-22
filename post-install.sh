@@ -404,7 +404,6 @@ main() {
   fi
   completed+=('Applying KDE Plasma Config')
   completed+=('Applying CoolerControl Config')
-  [[ "$tty" == yes ]] && draw_screen 'Finalizing' "${completed[@]}"
   success 'Post-installation sequence completed successfully.'
 }
 
@@ -416,3 +415,4 @@ if (($# == 0)); then main; else
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi
+printf '\n'
