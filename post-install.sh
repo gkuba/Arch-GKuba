@@ -357,6 +357,10 @@ applyKdePlasmaConfig() {
     error 'plasma-apply-colorscheme is unavailable.'
     return 1
   fi
+  if ! command -v plasma-apply-lookandfeel >/dev/null 2>&1; then
+    error 'plasma-apply-lookandfeel is unavailable.'
+    return 1
+  fi
 
   for name in "${cursor_theme_paths[@]}"; do
     if [[ -d "$name" ]]; then cursor_theme_found=yes; break; fi
@@ -378,12 +382,15 @@ applyKdePlasmaConfig() {
   fi
   info "Backed up existing KDE configuration files to $backup_dir"
 
-  # Breeze icons, without changing individual applications' bundled icons.
-  kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
+  # Apply Oxygen through KDE so its first-login defaults are recorded before
+  # the individual Oxygen components and Breeze Dark colors are set below.
+  if ! plasma-apply-lookandfeel --apply org.kde.oxygen; then
+    error 'Could not apply the Oxygen global theme through KDE.'
+    return 1
+  fi
 
-  # Oxygen application style, global theme, and Plasma style.
+  # Keep the Oxygen application style and Plasma style after applying the theme.
   kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Oxygen
-  kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
   kwriteconfig6 --file plasmarc --group Theme --key name oxygen
 
   # Keep the lock-screen theme Oxygen. Theme is used by
@@ -402,6 +409,16 @@ applyKdePlasmaConfig() {
       return 1
     fi
   fi
+  local configured_colorscheme
+  configured_colorscheme=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme)
+  if [[ "$configured_colorscheme" != BreezeDark ]]; then
+    error "Breeze Dark did not persist as the active color scheme (KDE reports: ${configured_colorscheme:-<empty>})."
+    return 1
+  fi
+  success 'Verified Breeze Dark as the active KDE color scheme.'
+
+  # Breeze icons, without changing individual applications' bundled icons.
+  kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
 
   # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
   kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
