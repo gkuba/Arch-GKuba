@@ -429,12 +429,12 @@ applyKdePlasmaConfig() {
     fi
   fi
   local configured_accent
-  configured_accent=$(kreadconfig6 --file kdeglobals --group General --key AccentColor)
+  configured_accent=$(kreadconfig6 --file kdeglobals --group General --key accentColor)
   if [[ "$configured_accent" != '69,48,120' && "$configured_accent" != '#453078' ]]; then
     error "Violet-Noir accent did not persist (KDE reports: ${configured_accent:-<empty>})."
     return 1
   fi
-  kwriteconfig6 --file kdeglobals --group General --key AccentColorFromWallpaper false
+  kwriteconfig6 --file kdeglobals --group General --key accentColorFromWallpaper false
   success 'Verified the Violet-Noir custom accent color.'
 
   # Breeze icons, without changing individual applications' bundled icons.
