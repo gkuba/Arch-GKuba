@@ -15,6 +15,7 @@ RESET=$'\033[0m'
 # Package groups (manager-specific to support future distro mappings)
 PACMAN_EXTRA_DESKTOP_PACKAGES=(discord ghostty obsidian vivaldi spotify-launcher solaar)
 PACMAN_COOLING_PACKAGES=(coolercontrol coolercontrold liquidctl)
+PACMAN_NOCTALIA_PACKAGES=(noctalia)
 AUR_COOLING_PACKAGES=(nct6687d-dkms-git)
 DESETUP_REPO='https://github.com/gkuba/DESetupLinux.git'
 COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
@@ -68,7 +69,7 @@ draw_screen() {
   local active="$1" item done mark color
   shift
   printf '\033[H\033[2J%s%s╭──────────────────────────────────────────────╮%s\n%s%s│             Arch Post-Install Script         │%s\n%s%s╰──────────────────────────────────────────────╯%s\n\n' "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET" "$MAGENTA" "$BOLD" "$RESET"
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
       for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
@@ -78,9 +79,9 @@ draw_screen() {
   printf '\n'
 }
 mark_setup_complete_in_place() {
-  local item done row=5 output_row=13
+  local item done row=5 output_row=14
   is_tty || return 0
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
     for done in "$@"; do
       if [[ "$item" == "$done" ]]; then
         printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
@@ -117,7 +118,7 @@ append_wrapped_packages() {
   [[ -n "$line" ]] && output_ref+=("$line")
 }
 wizard_panel() {
-  if is_tty; then printf '\033[13;1H\033[J'; fi
+  if is_tty; then printf '\033[14;1H\033[J'; fi
   panel "$@"
 }
 ask_yes_no() {
@@ -148,7 +149,7 @@ run_in_progress_area() {
   local rows rc=0
   rows=$(tput lines 2>/dev/null || printf '24')
   if (( rows < 18 )); then "$@"; return; fi
-  printf '\033[13;%sr\033[13;1H' "$rows"
+  printf '\033[14;%sr\033[14;1H' "$rows"
   "$@" || rc=$?
   # Keep pacman/sudo diagnostics visible if a stage fails. On success the next
   # draw_screen refreshes the display before beginning the following stage.
@@ -231,6 +232,95 @@ installDesktopAssets() {
   rm -rf -- "$scratch"
   success 'Selected desktop assets copied; unrelated destination files were retained.'
 }
+installNoctaliaShellForKde() {
+  local scratch staged_config staged_palette config_target palette_target override_file autostart_target backup_dir
+  local has_override=no
+
+  assert_prerequisites
+  command -v git >/dev/null 2>&1 || { error 'git is required to download the Noctalia configuration.'; return 1; }
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/noctalia-setup.XXXXXXXX")
+  if ! git clone --depth=1 "$DESETUP_REPO" "$scratch/DESetupLinux"; then
+    rm -rf -- "$scratch"
+    error 'Could not download the Noctalia configuration from DESetupLinux.'
+    return 1
+  fi
+
+  staged_config="$scratch/DESetupLinux/.config/noctalia/config.toml"
+  staged_palette="$scratch/DESetupLinux/.config/noctalia/palettes/Violet-Noir.json"
+  if [[ ! -f "$staged_config" || ! -f "$staged_palette" ]]; then
+    rm -rf -- "$scratch"
+    error 'DESetupLinux is missing the Noctalia config or Violet-Noir palette.'
+    return 1
+  fi
+
+  sudo pacman -S --needed --noconfirm "${PACMAN_NOCTALIA_PACKAGES[@]}"
+
+  config_target="$HOME/.config/noctalia/config.toml"
+  palette_target="$HOME/.config/noctalia/palettes/Violet-Noir.json"
+  override_file="$HOME/.local/state/noctalia/settings.toml"
+  autostart_target="$HOME/.config/autostart/noctalia.desktop"
+  backup_dir="$HOME/.dotfiles-backup/noctalia-$(date +%Y%m%d-%H%M%S)"
+  if [[ -f "$config_target" || -f "$palette_target" || -f "$override_file" || -f "$autostart_target" ]]; then
+    mkdir -p "$backup_dir"
+    if [[ -f "$config_target" ]]; then cp -a -- "$config_target" "$backup_dir/config.toml"; fi
+    if [[ -f "$palette_target" ]]; then cp -a -- "$palette_target" "$backup_dir/Violet-Noir.json"; fi
+    if [[ -f "$autostart_target" ]]; then cp -a -- "$autostart_target" "$backup_dir/noctalia.desktop"; fi
+    if [[ -f "$override_file" ]]; then
+      cp -a -- "$override_file" "$backup_dir/settings.toml"
+      has_override=yes
+    fi
+    info "Backed up existing Noctalia files to $backup_dir"
+  fi
+
+  mkdir -p "${config_target%/*}" "${palette_target%/*}"
+  if ! sed "s|@HOME@|$HOME|g" "$staged_config" > "$scratch/config.toml"; then
+    rm -rf -- "$scratch"
+    error 'Could not substitute the home directory into the Noctalia config.'
+    return 1
+  fi
+  install -m 644 "$scratch/config.toml" "$config_target"
+  install -m 644 "$staged_palette" "$palette_target"
+  rm -rf -- "$scratch"
+
+  # Register Noctalia for KDE login before removing Plasma's panels.
+  mkdir -p "${autostart_target%/*}"
+  cat > "$autostart_target" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Noctalia
+Exec=noctalia --daemon
+Terminal=false
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=2
+EOF
+  chmod 0644 "$autostart_target"
+
+  # Daemon mode returns only after Noctalia has initialized successfully. Keep
+  # the existing Plasma panels if the startup check fails.
+  info 'Starting Noctalia to verify its installation before changing Plasma panels.'
+  if ! noctalia --daemon; then
+    error 'Noctalia did not start successfully; Plasma panels were left unchanged.'
+    return 1
+  fi
+
+  # Run through the live Plasma scripting interface, preserving desktop
+  # containments while removing panel containments after the Noctalia check.
+  if ! command -v dbus-send >/dev/null 2>&1; then
+    error 'dbus-send is unavailable; Plasma panels were left unchanged.'
+    return 1
+  fi
+  dbus-send --session \
+    --dest=org.kde.plasmashell \
+    --type=method_call \
+    /PlasmaShell \
+    org.kde.PlasmaShell.evaluateScript \
+    'string:for (const panel of panels()) { panel.remove(); }'
+
+  if [[ "$has_override" == yes ]]; then
+    warn "Existing Noctalia GUI overrides were preserved and may take precedence; backup: $backup_dir/settings.toml"
+  fi
+  success 'Noctalia installed, started, configured to autostart, and Plasma panels removed.'
+}
 applyKdePlasmaConfig() {
   local backup_dir name cursor_theme_found=no
   local wallpaper_dir="$HOME/Pictures/Wallpapers" wallpaper_source
@@ -259,7 +349,7 @@ applyKdePlasmaConfig() {
 
   backup_dir="$HOME/.dotfiles-backup/kde-appearance-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$backup_dir"
-  for name in kdeglobals kcminputrc kwinrc plasmarc kglobalshortcutsrc plasma-org.kde.plasma.desktop-appletsrc; do
+  for name in kdeglobals kcminputrc kwinrc plasmarc kglobalshortcutsrc kscreenlockerrc plasma-org.kde.plasma.desktop-appletsrc; do
     if [[ -f "$HOME/.config/$name" ]]; then
       cp -a -- "$HOME/.config/$name" "$backup_dir/$name"
     fi
@@ -287,8 +377,9 @@ applyKdePlasmaConfig() {
   kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.oxygen
   kwriteconfig6 --file plasmarc --group Theme --key name oxygen
 
-  # Use wallpaper-derived accent rather than a fixed purple value.
-  kwriteconfig6 --file kdeglobals --group General --key accentColorFromWallpaper true
+  # Use the Violet-Noir custom accent instead of a wallpaper-derived color.
+  kwriteconfig6 --file kdeglobals --group General --key AccentColor '69,48,120'
+  kwriteconfig6 --file kdeglobals --group General --key AccentColorFromWallpaper false
 
   # Oxygen window decorations; don't modify KWin behavior or effects.
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.oxygen
@@ -393,6 +484,20 @@ subprocess.run([
     info "Wallpaper directory not found; skipping Plasma Login Manager wallpaper setup: $wallpaper_dir"
   fi
 
+  # Reuse the installed login wallpaper for the Plasma lock screen.
+  local login_wallpaper='/var/lib/plasmalogin/wallpapers/login-wallpaper.png'
+  if [[ -f "$login_wallpaper" ]]; then
+    kwriteconfig6 \
+      --file kscreenlockerrc \
+      --group Greeter \
+      --group Wallpaper \
+      --group org.kde.image \
+      --group General \
+      --key Image \
+      "file://${login_wallpaper}"
+    success 'Configured the Plasma lock-screen wallpaper.'
+  fi
+
   printf '\n'
   success 'KDE Plasma appearance, terminal, input, and wallpaper settings written.'
   info 'Some changes may require logging out and back in.'
@@ -400,7 +505,7 @@ subprocess.run([
 
 # Wizard prompts and summary
 gatherWizardAnswers() {
-  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no
+  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no; INSTALL_NOCTALIA=no
   WANT_WALLPAPERS=no; WANT_CURSORS=no
   local -a package_lines=()
   append_wrapped_packages package_lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
@@ -435,12 +540,12 @@ gatherWizardAnswers() {
     done
   fi
 
-  local -a kde_config_lines=('Oxygen style and Breeze Dark colors' 'Set Ghostty as the default terminal')
+  local -a kde_config_lines=('Oxygen style, Breeze Dark colors, and Violet-Noir accent' 'Set Ghostty as the default terminal')
   kde_config_lines+=('Bind Super+X and Ctrl+Alt+T to Ghostty')
   kde_config_lines+=('Allow X11 apps to receive mouse-button events for PTT')
   kde_config_lines+=('Turn Num Lock on when Plasma starts')
   kde_config_lines+=('Set an hourly slideshow on all screens if wallpapers exist')
-  kde_config_lines+=('Set a random PNG as the Plasma Login Manager wallpaper if available')
+  kde_config_lines+=('Set a random PNG for the Plasma login and lock screens if available')
   kde_config_lines+=('Oxygen will be added to the installed package list')
   kde_config_lines+=('Ghostty will be added if Extra Desktop Apps is not selected')
   kde_config_lines+=('Requires the Empty-Butterfly-Purple cursor theme; it will be added')
@@ -453,6 +558,13 @@ gatherWizardAnswers() {
       WANT_CURSORS=yes
     fi
   fi
+
+  local -a noctalia_lines=('Install noctalia and deploy its DESetupLinux config and Violet-Noir palette')
+  noctalia_lines+=('Start and verify Noctalia, then remove Plasma panels')
+  noctalia_lines+=('Create KDE autostart entry for noctalia --daemon')
+  noctalia_lines+=('Existing GUI settings are backed up and left in place')
+  wizard_panel 'Noctalia shell for KDE' "${noctalia_lines[@]}"
+  if ask_yes_no 'Install Noctalia shell for KDE?' no; then INSTALL_NOCTALIA=yes; fi
   return 0
 }
 showPlan() {
@@ -479,7 +591,13 @@ showPlan() {
     lines+=('KDE Plasma Configuration:')
     lines+=('  Install Oxygen and Ghostty; apply KDE appearance, terminal, and input settings')
     lines+=('  Set an hourly all-screen wallpaper slideshow if wallpapers exist')
-    lines+=('  Set a random PNG login wallpaper if one is available')
+    lines+=('  Set a random PNG for the Plasma login and lock screens if available')
+  fi
+  if [[ "$INSTALL_NOCTALIA" == yes ]]; then
+    lines+=('Noctalia shell for KDE:')
+    lines+=('  Install noctalia and deploy its DESetupLinux config and Violet-Noir palette')
+    lines+=('  Start and verify Noctalia, configure KDE autostart, then remove Plasma panels')
+    lines+=('  Preserve any existing Noctalia GUI overrides')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
@@ -534,7 +652,12 @@ main() {
     [[ "$tty" == yes ]] && draw_screen 'Applying KDE Plasma Config' "${completed[@]}"
     run_in_progress_area applyKdePlasmaConfig
   fi
-  completed+=('Applying KDE Plasma Config' 'Applying CoolerControl Config' 'Finalizing')
+  completed+=('Applying KDE Plasma Config')
+  if [[ "$INSTALL_NOCTALIA" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Installing Noctalia shell for KDE' "${completed[@]}"
+    run_in_progress_area installNoctaliaShellForKde
+  fi
+  completed+=('Installing Noctalia shell for KDE' 'Applying CoolerControl Config' 'Finalizing')
   mark_setup_complete_in_place "${completed[@]}"
   success 'Post-installation sequence completed successfully.'
 }

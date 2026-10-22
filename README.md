@@ -31,16 +31,25 @@ The wizard offers these optional selections:
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
 - **Desktop environment items:** wallpapers and cursor themes from DESetupLinux.
   Choose either or both when prompted; skip this option on headless systems.
-- **KDE Plasma configuration:** installs Oxygen and Ghostty, applies the selected KDE
-  appearance settings, sets Ghostty as the default terminal, and binds Super+X and
-  Ctrl+Alt+T to Ghostty. It also allows legacy X11 apps to receive mouse-button
-  events for PTT, enables Num Lock when Plasma starts, and configures an hourly
+- **KDE Plasma configuration:** installs Oxygen and Ghostty, applies Breeze Dark
+  with the Violet-Noir accent, sets Ghostty as the default terminal, and binds
+  Super+X and Ctrl+Alt+T to Ghostty. It also allows legacy X11 apps to receive
+  mouse-button events for PTT, enables Num Lock when Plasma starts, and configures an hourly
   all-screen wallpaper slideshow when `~/Pictures/Wallpapers` exists. When that
-  folder contains PNGs, it also selects one at random for Plasma Login Manager.
-  These settings are applied after package installation and desktop asset copying.
+  folder contains PNGs, it also selects one at random for Plasma Login Manager and
+  uses that image for the Plasma lock screen. These settings are applied after
+  package installation and desktop asset copying.
   Selecting it automatically adds the Empty-Butterfly-Purple cursor theme if it
   was not selected under Desktop Environment Items. Existing KDE configuration
   files are backed up in `~/.dotfiles-backup/` before changes are made.
+- **Noctalia shell for KDE:** installs the `noctalia` package and downloads its
+  `config.toml` and Violet-Noir palette from DESetupLinux into a temporary
+  staging directory. The script expands the `@HOME@` wallpaper path before
+  installing the config. Existing Noctalia files are backed up; GUI overrides
+  in `~/.local/state/noctalia/settings.toml` are preserved and may take precedence.
+  It creates a KDE autostart entry, starts Noctalia to verify initialization,
+  then removes Plasma panels through Plasma's scripting interface while keeping
+  desktop containments.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.
