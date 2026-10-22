@@ -264,8 +264,15 @@ applyKdePlasmaConfig() {
   done
   info "Backed up existing KDE configuration files to $backup_dir"
 
-  # KDE application color scheme. Apply through KDE's supported helper.
-  plasma-apply-colorscheme BreezeDark
+  # KDE application color scheme. Skip the helper when the requested scheme is
+  # already selected; some Plasma versions report that as a nonzero failure.
+  local current_color_scheme
+  current_color_scheme=$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)
+  if [[ "$current_color_scheme" == BreezeDark ]]; then
+    info 'BreezeDark is already selected; skipping color-scheme change.'
+  else
+    plasma-apply-colorscheme BreezeDark
+  fi
 
   # Breeze icons, without changing individual applications' bundled icons.
   kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze-dark
