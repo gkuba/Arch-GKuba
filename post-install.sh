@@ -72,7 +72,8 @@ draw_screen() {
   right_pad=$((width - ${#title} - left_pad))
   printf '\033[H\033[2J%s%s╭' "$MAGENTA" "$BOLD"
   printf '─%.0s' $(seq 1 "$width")
-  printf '╮%s\n│%*s%s%*s│\n╰' "$RESET" "$left_pad" '' "$title" "$right_pad" ''
+  printf '╮%s\n%s%s│%*s%s%*s│%s\n%s%s╰' \
+    "$RESET" "$MAGENTA" "$BOLD" "$left_pad" '' "$title" "$right_pad" '' "$RESET" "$MAGENTA" "$BOLD"
   printf '─%.0s' $(seq 1 "$width")
   printf '╯%s\n\n' "$RESET"
   for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
