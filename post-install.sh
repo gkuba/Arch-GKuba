@@ -492,6 +492,11 @@ subprocess.run([
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
+      --key WallpaperPlugin \
+      org.kde.image
+    kwriteconfig6 \
+      --file kscreenlockerrc \
+      --group Greeter \
       --group Wallpaper \
       --group org.kde.image \
       --group General \
