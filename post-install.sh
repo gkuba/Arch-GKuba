@@ -22,12 +22,13 @@ COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/r
 DEFAULT_INSTALL_EXTRA=no
 DEFAULT_INSTALL_COOLING=no
 DEFAULT_INSTALL_DESKTOP_ASSETS=no
+SUDO_KEEPALIVE_PID=''
 
 # Help and supported public actions
 usage() {
   cat <<EOF
 Arch Post-Install Script
-Usage: $(basename "$0") [installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|--help]
+Usage: post-install.sh [installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|--help]
 
 No argument runs the interactive wizard. Direct actions run only the selected
 task; package actions update the system first. Run as your user; sudo is
@@ -68,7 +69,7 @@ assert_prerequisites() {
   [[ -r /etc/arch-release ]] || { error 'Arch-based systems only.'; return 1; }
 }
 draw_screen() {
-  local active="$1" item done mark color title='Arch Post-Install Script' width=68 left_pad right_pad
+  local active="$1" item completed_item mark color title='Arch Post-Install Script' width=68 left_pad right_pad
   shift
   left_pad=$(((width - ${#title}) / 2))
   right_pad=$((width - ${#title} - left_pad))
@@ -81,18 +82,18 @@ draw_screen() {
   for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
-      for done in "$@"; do [[ "$item" == "$done" ]] && { mark='✓'; color="$GREEN"; break; }; done
+      for completed_item in "$@"; do [[ "$item" == "$completed_item" ]] && { mark='✓'; color="$GREEN"; break; }; done
     fi
     printf '  %s%s %s%s\n' "$color" "$mark" "$item" "$RESET"
   done
   printf '\n'
 }
 mark_setup_complete_in_place() {
-  local item done row=5 output_row=14
+  local item completed_item row=5 output_row=14
   is_tty || return 0
   for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
-    for done in "$@"; do
-      if [[ "$item" == "$done" ]]; then
+    for completed_item in "$@"; do
+      if [[ "$item" == "$completed_item" ]]; then
         printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
         break
       fi
@@ -140,31 +141,47 @@ ask_yes_no() {
   done
 }
 confirm_plan() { local answer; read -r -p 'Continue with this plan? [Y/n] ' answer || return 1; [[ "${answer,,}" != n && "${answer,,}" != no ]]; }
-spinner() {
-  local label="$1" chars='|/-\\' i=0 pid rc
-  shift
-  if ! is_tty; then "$@"; return; fi
-  "$@" & pid=$!
-  while kill -0 "$pid" 2>/dev/null; do printf '\r  %s%s%s %s' "$CYAN" "${chars:i++%4:1}" "$RESET" "$label"; sleep .12; done
-  if wait "$pid"; then rc=0; else rc=$?; fi
-  printf '\r\033[K'; return "$rc"
+on_error() {
+  local rc=$? line=${1:-?}
+  if is_tty; then printf '\033[r\033[?25h\n'; fi
+  error "Stopped at line $line (exit $rc). See the preceding error."
+  exit "$rc"
 }
-on_error() { local rc=$? line=${1:-?}; is_tty && printf '\033[?25h\n'; error "Stopped at line $line (exit $rc). See the preceding error."; exit "$rc"; }
 trap 'on_error $LINENO' ERR
 
 # Internal workflow helpers
-checkUpdates() { info 'Updating system packages.'; sudo pacman -Syu --noconfirm; }
+cleanupSudoKeepalive() {
+  if [[ -n "${SUDO_KEEPALIVE_PID:-}" ]]; then
+    local child_pid
+    child_pid=$(pgrep -P "$SUDO_KEEPALIVE_PID" || true)
+    [[ -n "$child_pid" ]] && kill $child_pid 2>/dev/null || true
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+  fi
+}
+trap cleanupSudoKeepalive EXIT
+startSudoKeepalive() {
+  [[ -n "$SUDO_KEEPALIVE_PID" ]] && return 0
+  sudo -v
+  (while :; do sleep 60; sudo -n -v || exit; done) </dev/null >/dev/null 2>&1 &
+  SUDO_KEEPALIVE_PID=$!
+}
+checkUpdates() {
+  startSudoKeepalive
+  info 'Updating system packages.'
+  sudo pacman -Syu --noconfirm
+  SYSTEM_UPDATE_RAN=yes
+}
 run_in_progress_area() {
   if ! is_tty; then "$@"; return; fi
-  local rows rc=0
+  local rows
   rows=$(tput lines 2>/dev/null || printf '24')
   if (( rows < 18 )); then "$@"; return; fi
   printf '\033[14;%sr\033[14;1H' "$rows"
-  "$@" || rc=$?
-  # Keep pacman/sudo diagnostics visible if a stage fails. On success the next
-  # draw_screen refreshes the display before beginning the following stage.
+  "$@"
+  # Restore the full scroll region after the stage. On failure, the ERR trap
+  # resets it before printing the error; successful redraw behavior is unchanged.
   printf '\033[s\033[r\033[u'
-  return "$rc"
 }
 installPackages() { local -n group="$1"; ((${#group[@]})) && sudo pacman -S --needed --noconfirm "${group[@]}"; }
 ensureParu() {
@@ -174,8 +191,41 @@ ensureParu() {
   command -v paru >/dev/null 2>&1 || { error 'paru installation did not complete.'; return 1; }
   success 'paru is ready.'
 }
+installKernelHeadersForDkms() {
+  local pkgbase_file pkgbase headers_package found_kernel=no
+  local -a pkgbase_files=(/usr/lib/modules/*/pkgbase) header_packages=()
+  local -A seen_headers=()
+
+  for pkgbase_file in "${pkgbase_files[@]}"; do
+    [[ -r "$pkgbase_file" ]] || continue
+    IFS= read -r pkgbase < "$pkgbase_file"
+    [[ -n "$pkgbase" ]] || continue
+    found_kernel=yes
+    headers_package="${pkgbase}-headers"
+    [[ -n "${seen_headers[$headers_package]:-}" ]] && continue
+    seen_headers[$headers_package]=yes
+    pacman -Qq "$headers_package" >/dev/null 2>&1 && continue
+    if ! pacman -Si "$headers_package" >/dev/null 2>&1; then
+      error "Matching headers package $headers_package is not available for installed kernel $pkgbase. Install the matching headers before using the CoolerControl sensor driver."
+      return 1
+    fi
+    header_packages+=("$headers_package")
+  done
+
+  if [[ "$found_kernel" != yes ]]; then
+    error 'Could not determine installed kernel package bases under /usr/lib/modules.'
+    return 1
+  fi
+  if ((${#header_packages[@]})); then
+    info "Installing matching kernel headers for DKMS: ${header_packages[*]}"
+    sudo pacman -S --needed --noconfirm "${header_packages[@]}"
+  else
+    info 'Matching kernel headers for DKMS are already installed.'
+  fi
+}
 installAurPackages() {
   ((${#@})) || return 0
+  installKernelHeadersForDkms
   ensureParu || return 1
   paru -S --needed --noconfirm "$@"
 }
@@ -207,6 +257,8 @@ run_group() {
 }
 installDesktopAssets() {
   local scratch choice wallpaper
+  WANT_WALLPAPERS=${WANT_WALLPAPERS:-no}
+  WANT_CURSORS=${WANT_CURSORS:-no}
   if [[ "${WANT_WALLPAPERS:-no}" != yes && "${WANT_CURSORS:-no}" != yes ]]; then
     while true; do
       read -r -p 'Choose [w]allpapers, [c]ursor themes, or [b]oth: ' choice || return 1
@@ -241,6 +293,20 @@ installDesktopAssets() {
   fi
   rm -rf -- "$scratch"
   success 'Selected desktop assets copied; unrelated destination files were retained.'
+}
+requireKdeSession() {
+  local desktop="${XDG_CURRENT_DESKTOP:-}"
+  desktop=${desktop,,}
+  if [[ "$desktop" != *kde* && "$desktop" != *plasma* && "${KDE_FULL_SESSION:-}" != true ]]; then
+    error 'This action requires an active KDE Plasma desktop session.'
+    return 1
+  fi
+  command -v dbus-send >/dev/null 2>&1 || { error 'dbus-send is required for the active Plasma session.'; return 1; }
+  if ! dbus-send --session --dest=org.kde.plasmashell --type=method_call \
+    /PlasmaShell org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1; then
+    error 'Could not reach plasmashell on the current session bus; no Noctalia changes were made.'
+    return 1
+  fi
 }
 configureNoctaliaShellForKde() {
   local scratch staged_config staged_palette config_target palette_target override_file autostart_target backup_dir
@@ -333,6 +399,7 @@ EOF
 }
 installNoctaliaShellForKde() {
   assert_prerequisites
+  requireKdeSession
   checkUpdates
   configureNoctaliaShellForKde
 }
@@ -557,7 +624,9 @@ subprocess.run([
       error "The selected lock-screen wallpaper is not readable: $wallpaper_source"
       return 1
     fi
-    local lock_wallpaper_url="file://${wallpaper_source}"
+    local lock_wallpaper_url
+    lock_wallpaper_url=$(WALLPAPER_SOURCE="$wallpaper_source" python3 -c \
+      'import os, urllib.parse; print("file://" + urllib.parse.quote(os.environ["WALLPAPER_SOURCE"]))')
     kwriteconfig6 \
       --file kscreenlockerrc \
       --group Greeter \
@@ -614,6 +683,7 @@ gatherWizardAnswers() {
   append_wrapped_packages package_lines "${PACMAN_COOLING_PACKAGES[@]}"
   package_lines+=('MSI sensor driver (AUR):')
   append_wrapped_packages package_lines "${AUR_COOLING_PACKAGES[@]}"
+  package_lines+=('Matching headers will be installed for DKMS.')
   package_lines+=('CoolerControl profile will also be applied.')
   wizard_panel 'CoolerControl and MSI sensor support' "${package_lines[@]}"
   if ask_yes_no 'Install CoolerControl and its MSI sensor driver?' "$DEFAULT_INSTALL_COOLING"; then INSTALL_COOLING=yes; fi
@@ -676,6 +746,7 @@ showPlan() {
     append_wrapped_packages lines "${PACMAN_COOLING_PACKAGES[@]}"
     lines+=('MSI sensor driver (AUR):')
     append_wrapped_packages lines "${AUR_COOLING_PACKAGES[@]}"
+    lines+=('Install matching kernel headers for DKMS')
     lines+=('Apply CoolerControl profile and enable daemon')
   fi
   if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
@@ -716,42 +787,48 @@ main() {
   [[ "$tty" == yes ]] && draw_screen 'Gathering Information' || printf 'Arch Post-Install Script\n\n'
   gatherWizardAnswers
   local -a completed=('Gathering Information')
-  [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
   showPlan
   confirm_plan || { info 'Setup cancelled; no changes were made.'; return 0; }
+  if [[ "$INSTALL_KDE_CONFIG" == yes || "$INSTALL_NOCTALIA" == yes ]]; then
+    requireKdeSession
+  fi
   [[ "$tty" == yes ]] && draw_screen 'Updating System' "${completed[@]}"
   run_in_progress_area checkUpdates; completed+=('Updating System')
-  [[ "$tty" == yes ]] && draw_screen 'Installing Pacman Packages' "${completed[@]}"
+  if [[ "$INSTALL_EXTRA" == yes || "$INSTALL_KDE_CONFIG" == yes || "$INSTALL_COOLING" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Installing Pacman Packages' "${completed[@]}"
+  fi
   if [[ "$INSTALL_EXTRA" == yes || "$INSTALL_KDE_CONFIG" == yes ]]; then
     run_in_progress_area installSelectedDesktopPackages
   fi
-  [[ "$INSTALL_COOLING" == yes ]] && run_in_progress_area installPackages PACMAN_COOLING_PACKAGES
-  completed+=('Installing Pacman Packages')
+  if [[ "$INSTALL_COOLING" == yes ]]; then
+    run_in_progress_area installPackages PACMAN_COOLING_PACKAGES
+  fi
+  if [[ "$INSTALL_EXTRA" == yes || "$INSTALL_KDE_CONFIG" == yes || "$INSTALL_COOLING" == yes ]]; then
+    completed+=('Installing Pacman Packages')
+  fi
   if [[ "$INSTALL_COOLING" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing AUR Packages' "${completed[@]}"
     run_in_progress_area installAurPackages "${AUR_COOLING_PACKAGES[@]}"; completed+=('Installing AUR Packages')
     [[ "$tty" == yes ]] && draw_screen 'Applying CoolerControl Config' "${completed[@]}"
     run_in_progress_area applyCoolerControlConfig
-  else
-    completed+=('Installing AUR Packages' 'Applying CoolerControl Config')
+    completed+=('Applying CoolerControl Config')
   fi
   if [[ "$INSTALL_DESKTOP_ASSETS" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing Desktop Assets' "${completed[@]}"
     run_in_progress_area installDesktopAssets
     completed+=('Installing Desktop Assets')
-  else
-    completed+=('Installing Desktop Assets')
   fi
   if [[ "$INSTALL_KDE_CONFIG" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Applying KDE Plasma Config' "${completed[@]}"
     run_in_progress_area applyKdePlasmaConfig
+    completed+=('Applying KDE Plasma Config')
   fi
-  completed+=('Applying KDE Plasma Config')
   if [[ "$INSTALL_NOCTALIA" == yes ]]; then
     [[ "$tty" == yes ]] && draw_screen 'Installing Noctalia shell for KDE' "${completed[@]}"
     run_in_progress_area configureNoctaliaShellForKde
+    completed+=('Installing Noctalia shell for KDE')
   fi
-  completed+=('Installing Noctalia shell for KDE' 'Applying CoolerControl Config' 'Finalizing')
+  completed+=('Finalizing')
   mark_setup_complete_in_place "${completed[@]}"
   success 'Post-installation sequence completed successfully.'
 }
@@ -763,5 +840,8 @@ if (($# == 0)); then main; else
     installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
+fi
+if [[ "${SYSTEM_UPDATE_RAN:-no}" == yes ]]; then
+  info 'If the update installed a new kernel, reboot to start it and load its DKMS modules.'
 fi
 printf '\n'

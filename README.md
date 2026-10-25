@@ -29,6 +29,8 @@ The wizard offers these optional selections:
   `liquidctl`, and `nct6687d-dkms-git` from the AUR. The CoolerControl profile
   is downloaded from the DESetupLinux repository, the daemon is enabled, and
   an existing `/etc/coolercontrol/config.toml` is backed up before replacement.
+  Matching headers are installed for the kernel packages present so DKMS can
+  build the sensor module.
 - **Desktop environment items:** wallpapers and cursor themes from DESetupLinux.
   Choose either or both when prompted; skip this option on headless systems.
 - **KDE Plasma configuration:** installs Oxygen and Ghostty, applies Breeze Dark
@@ -49,7 +51,8 @@ The wizard offers these optional selections:
   in `~/.local/state/noctalia/settings.toml` are preserved and may take precedence.
   It creates a KDE autostart entry, starts Noctalia to verify initialization,
   then removes Plasma panels through Plasma's scripting interface while keeping
-  desktop containments.
+  desktop containments. The wizard checks for a working Plasma session before
+  it updates or installs anything for this selection.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.
@@ -87,3 +90,6 @@ Show usage with:
 
 The lower-level package and system helpers are internal implementation details
 and are not supported command-line actions.
+
+If a system update installs a new kernel, reboot to start it and load DKMS
+modules built for that kernel.
