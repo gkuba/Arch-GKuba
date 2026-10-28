@@ -491,31 +491,41 @@ configureHyprlandNoctaliaSettings() {
   if command -v noctalia >/dev/null 2>&1; then
     # Let Noctalia's config watcher load the newly copied settings.
     sleep 1
-    # Keep the appearance settings effective even when the user has older
-    # GUI-managed Noctalia overrides in settings.toml. Keep the user's existing
-    # default bar shape while applying the requested size and widget styling.
-    noctalia msg config-set bar.default.thickness '36' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.scale '1.2' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.start '["control-center", "launcher", "wallpaper", "workspaces", "active_window", "taskbar"]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.center '["group:g1"]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.end '["sysmon", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "power_profile", "session"]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.capsule_group '[{ id = "g1", members = ["clock", "date", "weather"], enabled = true, fill = "#202229", foreground = "#E5E7ED", opacity = 1.0, padding = 6.0, border_width = 1.0 }]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.enabled 'false' >/dev/null 2>&1 || bar_style_applied=no
+    # Update the existing main bar; do not add a second bar or disable main.
+    noctalia msg config-set bar.main.thickness '36' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.scale '1.2' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.font_scale '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.margin_ends '100' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.margin_edge '0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.margin_opposite_edge '0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.padding '14' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.radius '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.radius_top_left '24' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.radius_top_right '24' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.radius_bottom_left '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.radius_bottom_right '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.concave_edge_corners 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.start '["launcher", "wallpaper", "layout_gap_start", "taskbar", "layout_gap_active", "active_window"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.center '["clock", "date", "weather"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.end '["workspaces", "layout_gap_end", "sysmon", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "power_profile", "control-center", "session"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.layout_gap_start.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.layout_gap_active.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.layout_gap_end.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.workspaces.capsule 'false' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.network.show_label 'false' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.session.icon_color "'#72B87A'" >/dev/null 2>&1 || bar_style_applied=no
     if [[ "$bar_style_applied" == yes ]]; then
       success 'Updated the existing Noctalia bar.'
     else
-      warn 'Could not apply all Noctalia bar colors.'
+      warn 'Could not apply all Noctalia bar settings.'
     fi
     if noctalia msg color-scheme-set custom Violet-Noir >/dev/null 2>&1; then
       active_theme=$(noctalia msg color-scheme-get 2>/dev/null || true)
