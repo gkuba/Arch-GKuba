@@ -44,8 +44,9 @@ The wizard offers these optional selections:
   Selecting it automatically adds the Empty-Butterfly-Purple cursor theme if it
   was not selected under Desktop Environment Items. Existing KDE configuration
   files are backed up in `~/.dotfiles-backup/` before changes are made.
-- **Noctalia shell for KDE:** installs the `noctalia` package and downloads its
-  `config.toml` and Violet-Noir palette from DESetupLinux into a temporary
+- **Noctalia KDE Plasma:** installs the `noctalia` package and downloads its
+  `config.toml` and Violet-Noir palette from `KDE Plasma/.config/noctalia/` in
+  DESetupLinux into a temporary
   staging directory. The script expands the `@HOME@` wallpaper path before
   installing the config. Existing Noctalia files are backed up; GUI overrides
   in `~/.local/state/noctalia/settings.toml` are preserved and may take precedence.
@@ -53,6 +54,13 @@ The wizard offers these optional selections:
   then removes Plasma panels through Plasma's scripting interface while keeping
   desktop containments. The wizard checks for a working Plasma session before
   it updates or installs anything for this selection.
+- **Hyprland & Noctalia Appearance:** downloads the `.config` additions
+  from `Hyprland/` in DESetupLinux. It backs up files it replaces, adds the
+  visual Lua module to an existing `~/.config/hypr/hyprland.lua` once, and
+  installs a separate Noctalia overlay and Violet-Noir palette. It leaves
+  monitor settings, keybindings, wallpapers, and Noctalia GUI overrides in
+  place. Hyprland 0.55+ with a Lua entrypoint is required; this option installs
+  configuration only and does not install Hyprland or Noctalia.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.
@@ -68,8 +76,8 @@ Package actions update the system before installing their selected packages.
 The cooling action also installs the AUR sensor driver and applies the
 CoolerControl profile. `installDesktopAssets` prompts you to choose wallpapers,
 cursors, or both, then copies them into the matching user directories without
-removing unrelated files; it does not update packages. The Noctalia action must
-run inside the active KDE Plasma session: it starts Noctalia to verify setup,
+removing unrelated files; it does not update packages. The Noctalia KDE Plasma
+action must run inside the active KDE Plasma session: it starts Noctalia to verify setup,
 creates its autostart entry, and removes Plasma panels while preserving desktop
 containments.
 
@@ -78,6 +86,7 @@ containments.
 ./post-install.sh installCooling
 ./post-install.sh installDesktopAssets
 ./post-install.sh installNoctaliaShellForKde
+./post-install.sh installHyprlandNoctaliaConfig
 ```
 
 Run the script without an action to use the full interactive wizard.

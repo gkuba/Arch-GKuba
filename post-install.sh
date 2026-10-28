@@ -28,7 +28,7 @@ SUDO_KEEPALIVE_PID=''
 usage() {
   cat <<EOF
 Arch Post-Install Script
-Usage: post-install.sh [installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|--help]
+Usage: post-install.sh [installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|installHyprlandNoctaliaConfig|--help]
 
 No argument runs the interactive wizard. Direct actions run only the selected
 task; package actions update the system first. Run as your user; sudo is
@@ -38,6 +38,7 @@ requested as needed.
   installCooling            Install CoolerControl and MSI sensor support
   installDesktopAssets      Copy selected wallpapers and/or cursor themes
   installNoctaliaShellForKde Install and configure Noctalia in the active KDE session
+  installHyprlandNoctaliaConfig Deploy Hyprland and Noctalia appearance settings
 EOF
 }
 
@@ -79,7 +80,7 @@ draw_screen() {
     "$RESET" "$MAGENTA" "$BOLD" "$left_pad" '' "$title" "$right_pad" '' "$RESET" "$MAGENTA" "$BOLD"
   printf '─%.0s' $(seq 1 "$width")
   printf '╯%s\n\n' "$RESET"
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Noctalia KDE Plasma' 'Hyprland & Noctalia Appearance' 'Finalizing'; do
     mark='○'; color="$DIM"
     if [[ "$item" == "$active" ]]; then mark='●'; color="$CYAN$BOLD"; else
       for completed_item in "$@"; do [[ "$item" == "$completed_item" ]] && { mark='✓'; color="$GREEN"; break; }; done
@@ -89,9 +90,9 @@ draw_screen() {
   printf '\n'
 }
 mark_setup_complete_in_place() {
-  local item completed_item row=5 output_row=14
+  local item completed_item row=5 output_row=15
   is_tty || return 0
-  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Installing Noctalia shell for KDE' 'Finalizing'; do
+  for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Noctalia KDE Plasma' 'Hyprland & Noctalia Appearance' 'Finalizing'; do
     for completed_item in "$@"; do
       if [[ "$item" == "$completed_item" ]]; then
         printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
@@ -177,7 +178,7 @@ run_in_progress_area() {
   local rows
   rows=$(tput lines 2>/dev/null || printf '24')
   if (( rows < 18 )); then "$@"; return; fi
-  printf '\033[14;%sr\033[14;1H' "$rows"
+  printf '\033[15;%sr\033[15;1H' "$rows"
   "$@"
   # Restore the full scroll region after the stage. On failure, the ERR trap
   # resets it before printing the error; successful redraw behavior is unchanged.
@@ -321,8 +322,8 @@ configureNoctaliaShellForKde() {
     return 1
   fi
 
-  staged_config="$scratch/DESetupLinux/.config/noctalia/config.toml"
-  staged_palette="$scratch/DESetupLinux/.config/noctalia/palettes/Violet-Noir.json"
+  staged_config="$scratch/DESetupLinux/KDE Plasma/.config/noctalia/config.toml"
+  staged_palette="$scratch/DESetupLinux/KDE Plasma/.config/noctalia/palettes/Violet-Noir.json"
   if [[ ! -f "$staged_config" || ! -f "$staged_palette" ]]; then
     rm -rf -- "$scratch"
     error 'DESetupLinux is missing the Noctalia config or Violet-Noir palette.'
@@ -402,6 +403,62 @@ installNoctaliaShellForKde() {
   requireKdeSession
   checkUpdates
   configureNoctaliaShellForKde
+}
+configureHyprlandNoctaliaSettings() {
+  local scratch staged_config_dir overlay_target backup_dir source_file relative_path target_file
+  local config_target="$HOME/.config/hypr/hyprland.lua"
+  local overlay_line='dofile(os.getenv("HOME") .. "/.config/hypr/visual-overlay.lua")'
+
+  assert_prerequisites
+  command -v git >/dev/null 2>&1 || { error 'git is required to download the Hyprland configuration.'; return 1; }
+  [[ -f "$config_target" ]] || {
+    error "No Hyprland Lua config was found at $config_target; no files were changed."
+    return 1
+  }
+
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/hyprland-noctalia-setup.XXXXXXXX")
+  if ! git clone --depth=1 "$DESETUP_REPO" "$scratch/DESetupLinux"; then
+    rm -rf -- "$scratch"
+    error 'Could not download the Hyprland configuration from DESetupLinux.'
+    return 1
+  fi
+
+  staged_config_dir="$scratch/DESetupLinux/Hyprland/.config"
+  overlay_target="$staged_config_dir/hypr/visual-overlay.lua"
+  [[ -f "$overlay_target" && -f "$staged_config_dir/noctalia/90-hyprland-overlay.toml" && -f "$staged_config_dir/noctalia/palettes/Violet-Noir.json" ]] || {
+    rm -rf -- "$scratch"
+    error 'DESetupLinux is missing one or more Hyprland/Noctalia overlay files.'
+    return 1
+  }
+
+  backup_dir="$HOME/.dotfiles-backup/hyprland-noctalia-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$HOME/.config"
+  while IFS= read -r -d '' source_file; do
+    relative_path=${source_file#"$staged_config_dir/"}
+    target_file="$HOME/.config/$relative_path"
+    if [[ -e "$target_file" || -L "$target_file" ]]; then
+      mkdir -p "$backup_dir/${relative_path%/*}"
+      cp -a -- "$target_file" "$backup_dir/$relative_path"
+    fi
+  done < <(find "$staged_config_dir" -type f -print0)
+  cp -a -- "$staged_config_dir/." "$HOME/.config/"
+
+  if ! grep -Fq "$overlay_line" "$config_target"; then
+    mkdir -p "$backup_dir"
+    cp -a -- "$config_target" "$backup_dir/hyprland.lua"
+    {
+      printf '\n-- Arch-GKuba managed visual overlay\n'
+      printf '%s\n' "$overlay_line"
+    } >> "$config_target"
+  fi
+  rm -rf -- "$scratch"
+  if [[ -d "$backup_dir" ]]; then
+    info "Existing configuration backups are in $backup_dir"
+  fi
+  success 'Hyprland and Noctalia appearance settings deployed; existing bindings and monitor settings were preserved.'
+}
+installHyprlandNoctaliaConfig() {
+  configureHyprlandNoctaliaSettings
 }
 applyKdePlasmaConfig() {
   local backup_dir name cursor_theme_found=no
@@ -672,7 +729,7 @@ subprocess.run([
 
 # Wizard prompts and summary
 gatherWizardAnswers() {
-  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no; INSTALL_NOCTALIA=no
+  INSTALL_EXTRA=no; INSTALL_COOLING=no; INSTALL_DESKTOP_ASSETS=no; INSTALL_KDE_CONFIG=no; INSTALL_NOCTALIA=no; INSTALL_HYPRLAND_CONFIG=no
   WANT_WALLPAPERS=no; WANT_CURSORS=no
   local -a package_lines=()
   append_wrapped_packages package_lines "${PACMAN_EXTRA_DESKTOP_PACKAGES[@]}"
@@ -731,8 +788,12 @@ gatherWizardAnswers() {
   noctalia_lines+=('Autostart on KDE login')
   noctalia_lines+=('Remove Plasma panels')
   noctalia_lines+=('Preserve existing GUI overrides')
-  wizard_panel 'Noctalia shell for KDE' "${noctalia_lines[@]}"
-  if ask_yes_no 'Install Noctalia shell for KDE?' no; then INSTALL_NOCTALIA=yes; fi
+  wizard_panel 'Noctalia KDE Plasma' "${noctalia_lines[@]}"
+  if ask_yes_no 'Install Noctalia KDE Plasma?' no; then INSTALL_NOCTALIA=yes; fi
+
+  local -a hyprland_noctalia_lines=('Apply Hyprland visual style and floating defaults' 'Keep games tiled; center modal dialogs' 'Set a compact Noctalia top bar with Violet-Noir' 'Preserve monitor settings and keybindings' 'Keep Noctalia GUI overrides in place')
+  wizard_panel 'Hyprland & Noctalia Appearance' "${hyprland_noctalia_lines[@]}"
+  if ask_yes_no 'Apply Hyprland and Noctalia appearance settings?' no; then INSTALL_HYPRLAND_CONFIG=yes; fi
   return 0
 }
 showPlan() {
@@ -761,8 +822,12 @@ showPlan() {
     lines+=('  Oxygen, Ghostty, theme, input, and wallpapers')
   fi
   if [[ "$INSTALL_NOCTALIA" == yes ]]; then
-    lines+=('Noctalia shell for KDE:')
+    lines+=('Noctalia KDE Plasma:')
     lines+=('  Install, configure, autostart, remove Plasma panels')
+  fi
+  if [[ "$INSTALL_HYPRLAND_CONFIG" == yes ]]; then
+    lines+=('Hyprland & Noctalia Appearance:')
+    lines+=('  Back up existing files and apply the visual overlay')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
@@ -824,9 +889,14 @@ main() {
     completed+=('Applying KDE Plasma Config')
   fi
   if [[ "$INSTALL_NOCTALIA" == yes ]]; then
-    [[ "$tty" == yes ]] && draw_screen 'Installing Noctalia shell for KDE' "${completed[@]}"
+    [[ "$tty" == yes ]] && draw_screen 'Noctalia KDE Plasma' "${completed[@]}"
     run_in_progress_area configureNoctaliaShellForKde
-    completed+=('Installing Noctalia shell for KDE')
+    completed+=('Noctalia KDE Plasma')
+  fi
+  if [[ "$INSTALL_HYPRLAND_CONFIG" == yes ]]; then
+    [[ "$tty" == yes ]] && draw_screen 'Hyprland & Noctalia Appearance' "${completed[@]}"
+    run_in_progress_area configureHyprlandNoctaliaSettings
+    completed+=('Hyprland & Noctalia Appearance')
   fi
   completed+=('Finalizing')
   mark_setup_complete_in_place "${completed[@]}"
@@ -837,7 +907,7 @@ main() {
 if (($# == 0)); then main; else
   case "$1" in
     --help|-h) usage ;;
-    installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
+    installExtraDesktopApps|installCooling|installDesktopAssets|installNoctaliaShellForKde|installHyprlandNoctaliaConfig) (($# == 1)) || { error 'Pass one action at a time.'; usage; exit 2; }; "$1" ;;
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi
