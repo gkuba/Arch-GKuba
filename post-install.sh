@@ -403,7 +403,7 @@ installNoctaliaShellForKde() {
 configureHyprlandNoctaliaSettings() {
   local scratch staged_config_dir overlay_target backup_dir source_file relative_path target_file
   local cursor_source cursor_target wallpaper_source wallpaper_target asset wallpaper
-  local wallpaper_applied=no theme_applied=no active_theme=
+  local wallpaper_applied=no theme_applied=no bar_style_applied=yes active_theme=
   local config_target="$HOME/.config/hypr/hyprland.lua"
   local overlay_line='dofile(os.getenv("HOME") .. "/.config/hypr/visual-overlay.lua")'
 
@@ -484,6 +484,22 @@ configureHyprlandNoctaliaSettings() {
   if command -v noctalia >/dev/null 2>&1; then
     # Let Noctalia's config watcher load the newly copied settings.
     sleep 1
+    # Keep the appearance settings effective even when the user has older
+    # GUI-managed Noctalia overrides in settings.toml. These are scalar style
+    # settings only; the existing bar widget layout is left untouched.
+    noctalia msg config-set bar.main.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    if [[ "$bar_style_applied" == yes ]]; then
+      success 'Applied Noctalia bar colors.'
+    else
+      warn 'Could not apply all Noctalia bar colors.'
+    fi
     if noctalia msg color-scheme-set custom Violet-Noir >/dev/null 2>&1; then
       active_theme=$(noctalia msg color-scheme-get 2>/dev/null || true)
     fi
