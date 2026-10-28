@@ -491,31 +491,31 @@ configureHyprlandNoctaliaSettings() {
   if command -v noctalia >/dev/null 2>&1; then
     # Let Noctalia's config watcher load the newly copied settings.
     sleep 1
-    # Update the existing main bar; do not add a second bar or disable main.
-    noctalia msg config-set bar.main.thickness '36' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.scale '1.2' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.font_scale '1.0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.margin_ends '100' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.margin_edge '0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.margin_opposite_edge '0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.padding '14' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.radius '12' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.radius_top_left '24' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.radius_top_right '24' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.radius_bottom_left '12' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.radius_bottom_right '12' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.concave_edge_corners 'true' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.start '["launcher", "wallpaper", "layout_gap_start", "taskbar", "layout_gap_active", "active_window"]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.center '["clock", "date", "weather"]' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.end '["workspaces", "layout_gap_end", "sysmon", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "power_profile", "control-center", "session"]' >/dev/null 2>&1 || bar_style_applied=no
+    # Update the existing default bar; do not create a second bar.
+    noctalia msg config-set bar.default.thickness '36' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.scale '1.2' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.font_scale '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.margin_ends '100' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.margin_edge '0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.margin_opposite_edge '0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.padding '14' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.radius '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.radius_top_left '24' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.radius_top_right '24' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.radius_bottom_left '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.radius_bottom_right '12' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.concave_edge_corners 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.start '["launcher", "wallpaper", "layout_gap_start", "taskbar", "layout_gap_active", "active_window"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.center '["clock", "date", "weather"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.end '["workspaces", "layout_gap_end", "sysmon", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "power_profile", "control-center", "session"]' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.layout_gap_start.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.layout_gap_active.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.layout_gap_end.type '"spacer"' >/dev/null 2>&1 || bar_style_applied=no
@@ -553,7 +553,7 @@ configureHyprlandNoctaliaSettings() {
   if [[ "$wallpaper_applied" != yes ]]; then
     info 'The wallpaper folder is configured; Noctalia will use it when the shell starts.'
   fi
-  success 'Hyprland and Noctalia appearance settings, cursor, and wallpapers are deployed; existing bindings and monitor settings were preserved.'
+  success 'Hyprland and Noctalia settings, cursor, wallpapers, and requested keybindings are applied; other bindings and monitor settings were preserved.'
 }
 installHyprlandNoctaliaConfig() {
   configureHyprlandNoctaliaSettings
