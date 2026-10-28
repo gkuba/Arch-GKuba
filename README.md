@@ -56,11 +56,15 @@ The wizard offers these optional selections:
   it updates or installs anything for this selection.
 - **Hyprland & Noctalia Appearance:** downloads the `.config` additions
   from `Hyprland/` in DESetupLinux. It backs up files it replaces, adds the
-  visual Lua module to an existing `~/.config/hypr/hyprland.lua` once, and
-  installs a separate Noctalia overlay and Violet-Noir palette. It leaves
-  monitor settings, keybindings, wallpapers, and Noctalia GUI overrides in
-  place. Hyprland 0.55+ with a Lua entrypoint is required; this option installs
-  configuration only and does not install Hyprland or Noctalia.
+  visual Lua module to an existing `~/.config/hypr/hyprland.lua` once, installs
+  the Empty-Butterfly-Purple cursor and DESetupLinux wallpapers, and adds a
+  Noctalia overlay with Violet-Noir colors and hourly random wallpaper changes.
+  It enables Noctalia Greeter Auto-Sync and requests an initial sync when the
+  Greeter helper and a running Noctalia session are available. Greeter sync may
+  request administrator authentication through Polkit. It preserves monitor
+  settings, keybindings, and Noctalia GUI overrides. Hyprland 0.55+ with a Lua
+  entrypoint is required; this option does not install Hyprland, Noctalia, or
+  Noctalia Greeter.
 
 Before making changes, the wizard summarizes the selected actions and asks for
 confirmation. It then updates the system and installs the selected packages.

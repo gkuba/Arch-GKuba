@@ -402,6 +402,8 @@ installNoctaliaShellForKde() {
 }
 configureHyprlandNoctaliaSettings() {
   local scratch staged_config_dir overlay_target backup_dir source_file relative_path target_file
+  local cursor_source cursor_target wallpaper_source wallpaper_target asset wallpaper
+  local noctalia_running=no wallpaper_applied=no
   local config_target="$HOME/.config/hypr/hyprland.lua"
   local overlay_line='dofile(os.getenv("HOME") .. "/.config/hypr/visual-overlay.lua")'
 
@@ -421,9 +423,18 @@ configureHyprlandNoctaliaSettings() {
 
   staged_config_dir="$scratch/DESetupLinux/Hyprland/.config"
   overlay_target="$staged_config_dir/hypr/visual-overlay.lua"
+  cursor_source="$scratch/DESetupLinux/.icons/Empty-Butterfly-Purple"
+  wallpaper_source="$scratch/DESetupLinux/Wallpapers"
+  cursor_target="$HOME/.icons/Empty-Butterfly-Purple"
+  wallpaper_target="$HOME/Pictures/Wallpapers"
   [[ -f "$overlay_target" && -f "$staged_config_dir/noctalia/90-hyprland-overlay.toml" && -f "$staged_config_dir/noctalia/palettes/Violet-Noir.json" ]] || {
     rm -rf -- "$scratch"
     error 'DESetupLinux is missing one or more Hyprland/Noctalia overlay files.'
+    return 1
+  }
+  [[ -d "$cursor_source" && -d "$wallpaper_source" ]] || {
+    rm -rf -- "$scratch"
+    error 'DESetupLinux is missing the Hyprland cursor theme or wallpaper assets.'
     return 1
   }
 
@@ -437,6 +448,25 @@ configureHyprlandNoctaliaSettings() {
       cp -a -- "$target_file" "$backup_dir/$relative_path"
     fi
   done < <(find "$staged_config_dir" -type f -print0)
+
+  # Install the same cursor and wallpaper assets used by the other desktop
+  # setup options. Existing files are backed up before being replaced.
+  mkdir -p "$HOME/.icons" "$wallpaper_target"
+  if [[ -e "$cursor_target" || -L "$cursor_target" ]]; then
+    mkdir -p "$backup_dir/.icons"
+    cp -a -- "$cursor_target" "$backup_dir/.icons/Empty-Butterfly-Purple"
+  fi
+  cp -a -- "$cursor_source" "$HOME/.icons/"
+  for asset in "$wallpaper_source"/* "$wallpaper_source"/.[!.]* "$wallpaper_source"/..?*; do
+    [[ -e "$asset" || -L "$asset" ]] || continue
+    [[ "${asset##*/}" == Archive ]] && continue
+    wallpaper="$wallpaper_target/${asset##*/}"
+    if [[ -e "$wallpaper" || -L "$wallpaper" ]]; then
+      mkdir -p "$backup_dir/Pictures/Wallpapers"
+      cp -a -- "$wallpaper" "$backup_dir/Pictures/Wallpapers/${asset##*/}"
+    fi
+    cp -a -- "$asset" "$wallpaper_target/"
+  done
   cp -a -- "$staged_config_dir/." "$HOME/.config/"
 
   if ! grep -Fq "$overlay_line" "$config_target"; then
@@ -451,7 +481,27 @@ configureHyprlandNoctaliaSettings() {
   if [[ -d "$backup_dir" ]]; then
     info "Existing configuration backups are in $backup_dir"
   fi
-  success 'Hyprland and Noctalia appearance settings deployed; existing bindings and monitor settings were preserved.'
+  if command -v noctalia >/dev/null 2>&1; then
+    # Let Noctalia's config watcher load the newly copied wallpaper settings.
+    sleep 1
+    if noctalia msg wallpaper-random >/dev/null 2>&1; then
+      wallpaper_applied=yes
+      success 'Applied a random wallpaper from ~/Pictures/Wallpapers.'
+    fi
+    if command -v noctalia-greeter-apply-appearance >/dev/null 2>&1; then
+      if noctalia msg greeter-sync >/dev/null 2>&1; then
+        success 'Synced Noctalia appearance to the login screen.'
+      else
+        warn 'Could not complete the initial Noctalia Greeter sync; Auto-Sync is enabled for later changes.'
+      fi
+    else
+      info 'Noctalia Greeter is not installed; its Auto-Sync setting will take effect if Greeter is installed later.'
+    fi
+  fi
+  if [[ "$wallpaper_applied" != yes ]]; then
+    info 'The wallpaper folder is configured; Noctalia will use it when the shell starts.'
+  fi
+  success 'Hyprland and Noctalia appearance settings, cursor, and wallpapers are deployed; existing bindings and monitor settings were preserved.'
 }
 installHyprlandNoctaliaConfig() {
   configureHyprlandNoctaliaSettings
@@ -787,7 +837,7 @@ gatherWizardAnswers() {
   wizard_panel 'Noctalia KDE Plasma' "${noctalia_lines[@]}"
   if ask_yes_no 'Install Noctalia KDE Plasma?' no; then INSTALL_NOCTALIA=yes; fi
 
-  local -a hyprland_noctalia_lines=('Apply Hyprland visual style and floating defaults' 'Keep games tiled; center modal dialogs' 'Set a compact Noctalia top bar with Violet-Noir' 'Preserve monitor settings and keybindings' 'Keep Noctalia GUI overrides in place')
+  local -a hyprland_noctalia_lines=('Apply Violet-Noir glassy visual style' 'Set Empty-Butterfly-Purple cursor and install wallpapers' 'Use the wallpaper folder for hourly random Noctalia backgrounds' 'Enable Noctalia Greeter appearance auto-sync' 'Preserve monitor settings and keybindings')
   wizard_panel 'Hyprland & Noctalia Appearance' "${hyprland_noctalia_lines[@]}"
   if ask_yes_no 'Apply Hyprland and Noctalia appearance settings?' no; then INSTALL_HYPRLAND_CONFIG=yes; fi
   return 0
@@ -823,7 +873,8 @@ showPlan() {
   fi
   if [[ "$INSTALL_HYPRLAND_CONFIG" == yes ]]; then
     lines+=('Hyprland & Noctalia Appearance:')
-    lines+=('  Back up existing files and apply the visual overlay')
+    lines+=('  Back up and install appearance config, cursor, and wallpapers')
+    lines+=('  Enable hourly random wallpapers and Greeter auto-sync')
   fi
   wizard_panel 'Setup Plan' "${lines[@]}"
 }
