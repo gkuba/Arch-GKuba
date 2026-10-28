@@ -59,9 +59,10 @@ The wizard offers these optional selections:
   visual Lua module to an existing `~/.config/hypr/hyprland.lua` once, installs
   the Empty-Butterfly-Purple cursor and DESetupLinux wallpapers, and adds a
   Noctalia overlay with Violet-Noir colors and hourly random wallpaper changes.
-  It enables Noctalia Greeter Auto-Sync and requests an initial sync when the
-  Greeter helper and a running Noctalia session are available. Greeter sync may
-  request administrator authentication through Polkit. It preserves monitor
+  When Noctalia is running, it explicitly selects Violet-Noir (overriding any
+  saved wallpaper-derived palette choice), then requests an initial Greeter sync.
+  It enables Greeter Auto-Sync. Sync may request administrator authentication
+  through Polkit. It preserves monitor
   settings, keybindings, and Noctalia GUI overrides. Hyprland 0.55+ with a Lua
   entrypoint is required; this option does not install Hyprland, Noctalia, or
   Noctalia Greeter.

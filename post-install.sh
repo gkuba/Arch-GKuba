@@ -403,7 +403,7 @@ installNoctaliaShellForKde() {
 configureHyprlandNoctaliaSettings() {
   local scratch staged_config_dir overlay_target backup_dir source_file relative_path target_file
   local cursor_source cursor_target wallpaper_source wallpaper_target asset wallpaper
-  local noctalia_running=no wallpaper_applied=no
+  local wallpaper_applied=no theme_applied=no active_theme=
   local config_target="$HOME/.config/hypr/hyprland.lua"
   local overlay_line='dofile(os.getenv("HOME") .. "/.config/hypr/visual-overlay.lua")'
 
@@ -482,17 +482,26 @@ configureHyprlandNoctaliaSettings() {
     info "Existing configuration backups are in $backup_dir"
   fi
   if command -v noctalia >/dev/null 2>&1; then
-    # Let Noctalia's config watcher load the newly copied wallpaper settings.
+    # Let Noctalia's config watcher load the newly copied settings.
     sleep 1
+    if noctalia msg color-scheme-set custom Violet-Noir >/dev/null 2>&1; then
+      active_theme=$(noctalia msg color-scheme-get 2>/dev/null || true)
+    fi
+    if [[ "$active_theme" == 'custom Violet-Noir' ]]; then
+      theme_applied=yes
+      success 'Verified Noctalia theme selection: Custom / Violet-Noir.'
+    else
+      warn 'Noctalia did not confirm Custom / Violet-Noir; the Greeter sync was skipped.'
+    fi
     if noctalia msg wallpaper-random >/dev/null 2>&1; then
       wallpaper_applied=yes
       success 'Applied a random wallpaper from ~/Pictures/Wallpapers.'
     fi
     if command -v noctalia-greeter-apply-appearance >/dev/null 2>&1; then
-      if noctalia msg greeter-sync >/dev/null 2>&1; then
-        success 'Synced Noctalia appearance to the login screen.'
+      if [[ "$theme_applied" == yes ]] && noctalia msg greeter-sync >/dev/null 2>&1; then
+        success 'Synced the Violet-Noir Noctalia appearance to the login screen.'
       else
-        warn 'Could not complete the initial Noctalia Greeter sync; Auto-Sync is enabled for later changes.'
+        warn 'Could not complete the initial Violet-Noir Greeter sync; Auto-Sync is enabled for later changes.'
       fi
     else
       info 'Noctalia Greeter is not installed; its Auto-Sync setting will take effect if Greeter is installed later.'
