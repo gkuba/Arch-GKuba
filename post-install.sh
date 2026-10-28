@@ -425,7 +425,7 @@ configureHyprlandNoctaliaSettings() {
   overlay_target="$staged_config_dir/hypr/visual-overlay.lua"
   cursor_source="$scratch/DESetupLinux/.icons/Empty-Butterfly-Purple"
   wallpaper_source="$scratch/DESetupLinux/Wallpapers"
-  cursor_target="$HOME/.icons/Empty-Butterfly-Purple"
+  cursor_target="$HOME/.local/share/icons/Empty-Butterfly-Purple-Hyprland"
   wallpaper_target="$HOME/Pictures/Wallpapers"
   [[ -f "$overlay_target" && -f "$staged_config_dir/noctalia/90-hyprland-overlay.toml" && -f "$staged_config_dir/noctalia/palettes/Violet-Noir.json" ]] || {
     rm -rf -- "$scratch"
@@ -451,12 +451,19 @@ configureHyprlandNoctaliaSettings() {
 
   # Install the same cursor and wallpaper assets used by the other desktop
   # setup options. Existing files are backed up before being replaced.
-  mkdir -p "$HOME/.icons" "$wallpaper_target"
+  mkdir -p "${cursor_target%/*}" "$wallpaper_target"
   if [[ -e "$cursor_target" || -L "$cursor_target" ]]; then
-    mkdir -p "$backup_dir/.icons"
-    cp -a -- "$cursor_target" "$backup_dir/.icons/Empty-Butterfly-Purple"
+    mkdir -p "$backup_dir/.local/share/icons"
+    cp -a -- "$cursor_target" "$backup_dir/.local/share/icons/Empty-Butterfly-Purple-Hyprland"
+    rm -rf -- "$cursor_target"
   fi
-  cp -a -- "$cursor_source" "$HOME/.icons/"
+  cp -a -- "$cursor_source" "$cursor_target"
+  # Keep DESetupLinux's shared KDE cursor source untouched. Normalize only this
+  # Hyprland-specific copy and give it a separate theme name.
+  sed -i \
+    -e 's/^Name=Empty-Butterfly-Purple$/Name=Empty-Butterfly-Purple-Hyprland/' \
+    -e 's/^Inherits=.*/Inherits=hicolor/' \
+    "$cursor_target/index.theme" "$cursor_target/cursor.theme"
   for asset in "$wallpaper_source"/* "$wallpaper_source"/.[!.]* "$wallpaper_source"/..?*; do
     [[ -e "$asset" || -L "$asset" ]] || continue
     [[ "${asset##*/}" == Archive ]] && continue
