@@ -492,16 +492,23 @@ configureHyprlandNoctaliaSettings() {
     # Let Noctalia's config watcher load the newly copied settings.
     sleep 1
     # Keep the appearance settings effective even when the user has older
-    # GUI-managed Noctalia overrides in settings.toml. These are scalar style
-    # settings only; the existing bar widget layout is left untouched.
-    noctalia msg config-set bar.main.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.main.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    # GUI-managed Noctalia overrides in settings.toml. Keep the user's existing
+    # default bar shape while applying the requested size and widget styling.
+    noctalia msg config-set bar.default.thickness '36' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.scale '1.2' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.icon_color "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.capsule_fill "'#202229'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.capsule_foreground "'#E5E7ED'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.background_opacity '0.72' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.start '["workspaces", "active_window"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.main.enabled 'false' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.workspaces.capsule 'false' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.network.show_label 'false' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set widget.session.icon_color "'#72B87A'" >/dev/null 2>&1 || bar_style_applied=no
     if [[ "$bar_style_applied" == yes ]]; then
       success 'Applied Noctalia bar colors.'
     else
