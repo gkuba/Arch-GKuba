@@ -90,20 +90,16 @@ draw_screen() {
   printf '\n'
 }
 mark_setup_complete_in_place() {
-  local item completed_item row=5 output_row=15
+  local item row=5 output_row=15
   is_tty || return 0
   for item in 'Gathering Information' 'Updating System' 'Installing Pacman Packages' 'Installing AUR Packages' 'Applying CoolerControl Config' 'Installing Desktop Assets' 'Applying KDE Plasma Config' 'Noctalia KDE Plasma' 'Hyprland & Noctalia Appearance' 'Finalizing'; do
-    for completed_item in "$@"; do
-      if [[ "$item" == "$completed_item" ]]; then
-        printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
-        break
-      fi
-    done
+    # The finished view represents a completed run, including optional stages
+    # the user chose to skip.
+    printf '\033[%d;1H\033[2K  %s✓ %s%s' "$row" "$GREEN" "$item" "$RESET"
     row=$((row + 1))
   done
-  # Clear the last stage's completion/progress rows before writing final status.
-  printf '\033[%d;1H\033[2K\033[%d;1H\033[2K\033[%d;1H' \
-    "$output_row" "$((output_row + 1))" "$output_row"
+  # Clear the last stage's completion/progress area before final status output.
+  printf '\033[%d;1H\033[J' "$output_row"
 }
 panel() {
   local title="$1" line width=68
@@ -900,7 +896,12 @@ main() {
   fi
   completed+=('Finalizing')
   mark_setup_complete_in_place "${completed[@]}"
+  [[ "$tty" == yes ]] && printf '\033[15;1H'
   success 'Post-installation sequence completed successfully.'
+  if [[ "${SYSTEM_UPDATE_RAN:-no}" == yes ]]; then
+    info 'If the update installed a new kernel, reboot to start it and load its DKMS modules.'
+  fi
+  [[ "$tty" == yes ]] && printf '\n'
 }
 
 # Final dispatch
@@ -911,7 +912,4 @@ if (($# == 0)); then main; else
     *) error "Unknown action: $1"; usage; exit 2 ;;
   esac
 fi
-if [[ "${SYSTEM_UPDATE_RAN:-no}" == yes ]]; then
-  info 'If the update installed a new kernel, reboot to start it and load its DKMS modules.'
-fi
-printf '\n'
+[[ "${tty:-no}" == no ]] && printf '\n'
