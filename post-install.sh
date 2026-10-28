@@ -504,13 +504,16 @@ configureHyprlandNoctaliaSettings() {
     noctalia msg config-set bar.default.shadow 'true' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set bar.default.border "'#30303A'" >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set bar.default.border_width '1.0' >/dev/null 2>&1 || bar_style_applied=no
-    noctalia msg config-set bar.default.start '["workspaces", "active_window"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.start '["control-center", "launcher", "wallpaper", "workspaces", "active_window", "taskbar"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.center '["group:g1"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.end '["sysmon", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "power_profile", "session"]' >/dev/null 2>&1 || bar_style_applied=no
+    noctalia msg config-set bar.default.capsule_group '[{ id = "g1", members = ["clock", "date", "weather"], enabled = true, fill = "#202229", foreground = "#E5E7ED", opacity = 1.0, padding = 6.0, border_width = 1.0 }]' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set bar.main.enabled 'false' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.workspaces.capsule 'false' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.network.show_label 'false' >/dev/null 2>&1 || bar_style_applied=no
     noctalia msg config-set widget.session.icon_color "'#72B87A'" >/dev/null 2>&1 || bar_style_applied=no
     if [[ "$bar_style_applied" == yes ]]; then
-      success 'Applied Noctalia bar colors.'
+      success 'Updated the existing Noctalia bar.'
     else
       warn 'Could not apply all Noctalia bar colors.'
     fi
