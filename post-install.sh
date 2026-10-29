@@ -1758,7 +1758,7 @@ connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names out
 # Dank Shell reads its theme, cursor and wallpaper settings from settings.json
 # and session.json; dms-greeter sync links both into the login screen.
 apply_dank_shell_appearance() {
-  local scratch src backup_dir hypr_main settings session layout qt_config bin_dir theme wall_dir new group rc=0 step_rc i pick
+  local scratch src backup_dir hypr_main settings session layout qt_config bin_dir gtk_script gtk4_css theme wall_dir new group rc=0 step_rc i pick
   local -a qt5_plugins=()
   local cursor=Empty-Butterfly-Purple cursor_size=32
   local require_line
@@ -1929,6 +1929,42 @@ apply_dank_shell_appearance() {
     success 'Linked the qtengine Qt5 plugin into /usr/lib/qt/plugins for Qt5 apps.'
   elif (( DRY_RUN )); then
     dry_note 'a real run links the qtengine Qt5 plugin into /usr/lib/qt/plugins here.'
+  fi
+
+  # GTK apps (CachyOS Hello among them) follow Dank Shell only after its
+  # "Apply GTK colors" button. That runs gtk.sh, which copies adw-gtk3 into
+  # ~/.local/share/themes for Dank Shell to recolor, and imports
+  # dank-colors.css in gtk-4.0/gtk.css, which Dank Shell checks before it sets
+  # the GTK theme. gtk.sh stops at the GTK4 part until Dank Shell has generated
+  # its colors, so add that import here, and pick the dark theme right away.
+  gtk_script=''
+  for i in /usr/share/quickshell/dms/scripts/gtk.sh /usr/local/share/quickshell/dms/scripts/gtk.sh; do
+    [[ -f "$i" ]] && { gtk_script=$i; break; }
+  done
+  if [[ -n "$gtk_script" ]]; then
+    run bash "$gtk_script" "${XDG_CONFIG_HOME:-$HOME/.config}" apply false \
+      || info 'Dank Shell finishes the GTK4 colors once it has generated them at login.'
+  elif (( DRY_RUN )); then
+    dry_note "a real run applies Dank Shell's GTK colors here."
+  else
+    warn "Dank Shell's gtk.sh was not found; GTK apps keep their default theme."
+  fi
+  gtk4_css="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-4.0/gtk.css"
+  if [[ -L "$gtk4_css" ]]; then
+    warn "$(tilde "$gtk4_css") is a symlink; import dank-colors.css there yourself for Dank Shell's GTK colors."
+  elif ! grep -qF 'dank-colors.css' "$gtk4_css" 2>/dev/null; then
+    new="$scratch/gtk4.css"
+    { printf '%s\n' '@import url("dank-colors.css");'; [[ -f "$gtk4_css" ]] && cat -- "$gtk4_css"; } > "$new"
+    install_generated "$gtk4_css" "$new" "$backup_dir" || rc=1
+  fi
+  if ! command -v gsettings >/dev/null 2>&1; then
+    warn 'gsettings is not installed; GTK apps keep the light theme until Dank Shell sets it.'
+  elif [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]] && (( ! DRY_RUN )); then
+    warn 'No D-Bus session; GTK apps keep the light theme until Dank Shell sets it at login.'
+  else
+    run gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-dark || rc=1
+    run gsettings set org.gnome.desktop.interface color-scheme prefer-dark || rc=1
+    success 'Set GTK apps to adw-gtk3-dark and the dark color scheme.'
   fi
 
   # Login screen: link the settings into the greeter, then let the greeter

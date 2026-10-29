@@ -238,6 +238,13 @@ first, and running it again changes nothing that is already current:
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
   in random order every hour (monitor names come from `/sys/class/drm`);
+- themes GTK apps, CachyOS Hello among them, the way Dank Shell's "Apply GTK
+  colors" button does: runs its `gtk.sh apply` (copying adw-gtk3 into
+  `~/.local/share/themes` for Dank Shell to recolor), adds the
+  `dank-colors.css` import to `~/.config/gtk-4.0/gtk.css` (Dank Shell manages
+  the GTK theme only once that import is there), and sets `gtk-theme` to
+  `adw-gtk3-dark` and `color-scheme` to `prefer-dark` so the first login is
+  already dark;
 - themes Qt apps, Dolphin among them, with Dank Shell's colors through
   qtengine: `violet-noir.lua` sets `QT_QPA_PLATFORMTHEME` (and `_QT6`) to
   `qtengine` in place of the gtk3 passthrough, and the step points
