@@ -220,11 +220,13 @@ first, and running it again changes nothing that is already current:
   when the cursor is changed in its Settings;
 - installs `~/.config/hypr/violet-noir.lua` (gradient border, glassy windows
   at 90% focused and 82% unfocused, xray blur so windows blur the wallpaper
-  rather than the windows beneath); it overrides Dank Shell's Window opacity
-  slider;
+  rather than the windows beneath), which overrides Dank Shell's Window
+  opacity slider, and `~/.config/hypr/discord-ptt.lua`, which passes the side
+  mouse buttons (Mouse4, Mouse5) to Discord so push-to-talk works whichever
+  window is focused; both load at the end of `hyprland.lua`, after the Dank
+  Shell fragments;
 - turns on Dank Shell's Xray blur for its bar and popups by adding its rule
-  to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle
-  and loads it at the end of `hyprland.lua`, after the Dank Shell fragments;
+  to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle;
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
   in random order every hour (monitor names come from `/sys/class/drm`);

@@ -920,6 +920,7 @@ build_plan() {
     notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
     notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP glassy windows, xray blur $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin follows the theme")
     notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
+    notes+=("Discord push-to-talk on the side mouse buttons")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
       x86_64|aarch64) ;;
@@ -1746,7 +1747,7 @@ connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names out
 apply_dank_shell_appearance() {
   local scratch src backup_dir hypr_main settings session layout theme wall_dir new group rc=0 step_rc i pick
   local cursor=Empty-Butterfly-Purple cursor_size=32
-  local require_line='require("violet-noir")'
+  local require_line
   local -a images=() pairs=() used=()
   need_cmd git 'git is required to download DESetupLinux.' || return 1
   need_cmd jq 'jq is required to edit the Dank Shell settings.' || return 1
@@ -1766,21 +1767,25 @@ apply_dank_shell_appearance() {
     rm -rf -- "$scratch"; error 'Could not download DESetupLinux.'; return 1
   fi
   src="$scratch/DESetupLinux/DankShell/.config"
-  if [[ ! -f "$src/dms/themes/Violet-Noir.json" || ! -f "$src/hypr/violet-noir.lua" ]]; then
-    rm -rf -- "$scratch"; error 'DESetupLinux is missing DankShell/.config (theme or Hyprland looks).'; return 1
+  if [[ ! -f "$src/dms/themes/Violet-Noir.json" || ! -f "$src/hypr/violet-noir.lua" || ! -f "$src/hypr/discord-ptt.lua" ]]; then
+    rm -rf -- "$scratch"; error 'DESetupLinux is missing DankShell/.config (theme, Hyprland looks or Discord push-to-talk).'; return 1
   fi
   backup_dir="$HOME/.dotfiles-backup/dankshell-$(date +%Y%m%d-%H%M%S)"
 
-  # Theme and Hyprland looks.
+  # Theme, Hyprland looks and Discord push-to-talk, each Lua file loaded at the
+  # end of hyprland.lua after the Dank Shell fragments.
   install_user_file "$src/dms/themes/Violet-Noir.json" "$theme" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
-  install_user_file "$src/hypr/violet-noir.lua" "$HOME/.config/hypr/violet-noir.lua" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
-  if [[ -f "$hypr_main" ]] && grep -qxF "$require_line" "$hypr_main"; then
-    success 'hyprland.lua already loads violet-noir.lua.'
-  else
-    backup_user_file "$hypr_main" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
-    run append_line "$hypr_main" "$require_line" || { rm -rf -- "$scratch"; return 1; }
-    success 'hyprland.lua loads violet-noir.lua last, after the Dank Shell fragments.'
-  fi
+  for i in violet-noir discord-ptt; do
+    install_user_file "$src/hypr/$i.lua" "$HOME/.config/hypr/$i.lua" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+    require_line="require(\"$i\")"
+    if [[ -f "$hypr_main" ]] && grep -qxF "$require_line" "$hypr_main"; then
+      success "hyprland.lua already loads $i.lua."
+    else
+      backup_user_file "$hypr_main" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+      run append_line "$hypr_main" "$require_line" || { rm -rf -- "$scratch"; return 1; }
+      success "hyprland.lua loads $i.lua last, after the Dank Shell fragments."
+    fi
+  done
 
   # Theme and cursor in settings.json; other settings are kept.
   new="$scratch/settings.json"
