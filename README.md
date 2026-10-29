@@ -212,15 +212,18 @@ first, and running it again changes nothing that is already current:
 
 - installs the Violet-Noir custom theme to `~/.config/dms/themes/` and selects
   it in `~/.config/dms/settings.json`, together with the
-  Empty-Butterfly-Purple cursor at 32px (`cursorSettings`), 88% window
-  opacity (`hyprlandWindowOpacity`, the Window opacity slider) and the Fit
+  Empty-Butterfly-Purple cursor at 32px (`cursorSettings`) and the Fit
   wallpaper mode for the desktop and login screen, keeping every other
   setting;
 - writes the cursor to `~/.config/hypr/dms/cursor.lua` and `~/.Xresources`
   with the same content Dank Shell writes, because Dank Shell only writes them
   when the cursor is changed in its Settings;
-- installs `~/.config/hypr/violet-noir.lua` (gradient border, and xray blur
-  so windows blur the wallpaper rather than the windows beneath)
+- installs `~/.config/hypr/violet-noir.lua` (gradient border, glassy windows
+  at 90% focused and 82% unfocused, xray blur so windows blur the wallpaper
+  rather than the windows beneath); it overrides Dank Shell's Window opacity
+  slider;
+- turns on Dank Shell's Xray blur for its bar and popups by adding its rule
+  to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle
   and loads it at the end of `hyprland.lua`, after the Dank Shell fragments;
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one

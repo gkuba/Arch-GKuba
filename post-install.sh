@@ -918,7 +918,7 @@ build_plan() {
     if (( ADW_GTK_INSTALLED )); then notes=('adw-gtk-theme: installed'); else notes=('adw-gtk-theme: will install'); fi
     notes+=("Ghostty $G_SEP dms-greeter, dsearch, dcal $G_SEP existing Hyprland config backed up, then replaced")
     notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
-    notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP 88% windows, blurred wallpaper behind $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin in Breeze Dark")
+    notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP glassy windows, xray blur $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin in Breeze Dark")
     notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
@@ -1744,8 +1744,8 @@ connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names out
 # Dank Shell reads its theme, cursor and wallpaper settings from settings.json
 # and session.json; dms-greeter sync links both into the login screen.
 apply_dank_shell_appearance() {
-  local scratch src backup_dir hypr_main settings session theme wall_dir new group rc=0 step_rc i pick
-  local cursor=Empty-Butterfly-Purple cursor_size=32 window_opacity=88
+  local scratch src backup_dir hypr_main settings session layout theme wall_dir new group rc=0 step_rc i pick
+  local cursor=Empty-Butterfly-Purple cursor_size=32
   local require_line='require("violet-noir")'
   local -a images=() pairs=() used=()
   need_cmd git 'git is required to download DESetupLinux.' || return 1
@@ -1791,10 +1791,8 @@ apply_dank_shell_appearance() {
       .currentThemeName = "custom"
       | .customThemeFile = $theme
       | .cursorSettings = ((.cursorSettings // {}) + {theme: $cursor, size: ($size | tonumber)})
-      | .hyprlandWindowOpacity = ($opacity | tonumber)
       | .wallpaperFillMode = "Fit"
-      | .lockScreenWallpaperFillMode = "Fit"' --arg cursor "$cursor" --arg size "$cursor_size" \
-        --arg opacity "$window_opacity" > "$new"; then
+      | .lockScreenWallpaperFillMode = "Fit"' --arg cursor "$cursor" --arg size "$cursor_size" > "$new"; then
     rm -rf -- "$scratch"; error 'Could not build the Dank Shell settings.'; return 1
   fi
   install_generated "$settings" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
@@ -1811,6 +1809,19 @@ apply_dank_shell_appearance() {
   { [[ -f "$HOME/.Xresources" ]] && grep -vE '^[[:space:]]*Xcursor\.(theme|size):' "$HOME/.Xresources"
     printf 'Xcursor.theme: %s\nXcursor.size: %s\n' "$cursor" "$cursor_size"; } > "$new"
   install_generated "$HOME/.Xresources" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+
+  # Dank Shell keeps its Xray toggle (bar and popups blur the wallpaper) only
+  # in dms/layout.lua: it is on when this rule is present, and Dank Shell keeps
+  # it when it regenerates the file.
+  layout="$HOME/.config/hypr/dms/layout.lua"
+  if [[ -f "$layout" ]] && grep -qF '"^dms:.*$"' "$layout"; then
+    success "Dank Shell's Xray blur is already on."
+  else
+    new="$scratch/layout.lua"
+    { [[ -f "$layout" ]] && cat -- "$layout"
+      printf '\nhl.layer_rule({\n\tmatch = { namespace = "^dms:.*$" },\n\txray = true,\n})\n'; } > "$new"
+    install_generated "$layout" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+  fi
 
   # A random wallpaper per monitor, each rotating randomly every hour.
   for i in "$scratch/DESetupLinux/Wallpapers"/*; do
