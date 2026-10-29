@@ -926,7 +926,7 @@ build_plan() {
     fi
     notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP glassy windows, xray blur $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Qt apps follow the theme")
     notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
-    notes+=("Discord push-to-talk: forward mouse button holds F14")
+    notes+=("Discord push-to-talk on the side mouse buttons")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
       x86_64|aarch64) ;;
