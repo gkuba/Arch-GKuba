@@ -36,7 +36,8 @@ available.
 1. **Packages and updates** — choose the optional package groups and the full
    system update.
 2. **Desktop assets** — choose wallpapers and/or cursor themes.
-3. **Desktop themes** — choose the KDE Plasma configuration and/or Dank Shell.
+3. **Desktop themes** — choose the KDE Plasma configuration or Dank Shell.
+   Only one desktop is set up per machine, so choosing one clears the other.
 4. **Review selections** — fine-tune individual packages and items. Each one
    shows whether it is already installed on this system.
 5. **Review the plan** — a summary of everything the run will do. Problems
@@ -57,6 +58,7 @@ Installation then runs step by step, with live output in a frame:
 | Desktop assets | Wallpapers or cursor themes are selected |
 | KDE Plasma configuration | KDE Plasma configuration is selected |
 | Dank Shell | Dank Shell is selected |
+| Dank Shell appearance | Dank Shell is selected |
 
 - A step that succeeds continues automatically after a short pause.
 - If the system update or pacman package step fails, the run stops there.
@@ -95,7 +97,7 @@ the full log. The log path is shown on screen (under `/tmp`).
 -k, --kde          KDE Plasma configuration
 -D, --dankshell    Dank Shell on Hyprland with Ghostty (DuxLabs headless installer)
 -U, --update       Full system update (pacman -Syu) before anything else
--A, --all          -a, -c, -w, -u and -k (add -D for Dank Shell, -U for a system update)
+-A, --all          -a, -c, -w, -u and -k (add -U for a system update; with -D, Dank Shell replaces -k)
 -n, --dry-run      Run the whole wizard and install screens but change nothing
 -h, --help         Show help
 ```
@@ -106,8 +108,8 @@ Short options can be combined:
 
 ```bash
 ./post-install.sh -ak      # apps + KDE, starting at review
-./post-install.sh -An      # all selections except Dank Shell and the update, dry run
-./post-install.sh -DU      # Dank Shell after a full system update
+./post-install.sh -An      # all selections with KDE, no update, dry run
+./post-install.sh -ADU     # all selections with Dank Shell instead of KDE, after a system update
 ```
 
 `DRY_RUN=1 ./post-install.sh` also enables a dry run. In a dry run every
@@ -199,8 +201,33 @@ curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-f
   before running it, and duxinstall writes its own log to
   `/tmp/duxinstall-<timestamp>.log`.
 
-It does not need a Plasma session and can be installed alongside the KDE
-configuration. Log out and choose the Hyprland session to start it.
+It does not need a Plasma session. Choosing Dank Shell also selects the
+wallpapers and cursor themes, which its appearance step uses.
+
+The **Dank Shell appearance** step then applies the Violet-Noir look from
+[DESetupLinux/DankShell](https://github.com/gkuba/DESetupLinux/tree/main/DankShell).
+Changed files are backed up to `~/.dotfiles-backup/dankshell-<timestamp>/`
+first, and running it again changes nothing that is already current:
+
+- installs the Violet-Noir custom theme to `~/.config/dms/themes/` and selects
+  it in `~/.config/dms/settings.json`, together with the
+  Empty-Butterfly-Purple cursor at 48px (`cursorSettings`), keeping every
+  other setting;
+- installs `~/.config/hypr/violet-noir.lua` (gradient border, opacity, blur)
+  and loads it at the end of `hyprland.lua`, after the Dank Shell fragments;
+- in `~/.local/state/dms/session.json`, gives each connected monitor a random
+  wallpaper from `~/Pictures/Wallpapers` and rotates each one in random order
+  every hour (monitor names come from `/sys/class/drm`);
+- runs `dms-greeter sync --yes` so the login screen uses the same theme and
+  each monitor's current wallpaper, then lets the greeter group read
+  `~/Pictures/Wallpapers` with ACLs, which the sync does not cover.
+
+Log out (once more if the greeter group was just added) and choose the
+Hyprland session to start it. If Dank Shell is already running while the step
+runs, restart it so it reads the new settings.
+
+`DESETUP_REPO=<path or URL>` makes the script use another DESetupLinux
+checkout, for testing changes before they are pushed.
 
 ## After running
 

@@ -38,7 +38,8 @@ Selections:
   -k, --kde          KDE Plasma configuration (Oxygen, Breeze Dark, Violet-Noir, Ghostty)
   -D, --dankshell    Dank Shell on Hyprland with Ghostty, via the DuxLabs headless installer
   -U, --update       Full system update (pacman -Syu) before anything else
-  -A, --all          -a, -c, -w, -u and -k (add -D for Dank Shell, -U for a system update)
+  -A, --all          -a, -c, -w, -u and -k (add -U for a system update;
+                     with -D, Dank Shell replaces -k)
 
 Other:
   -n, --dry-run      Run the whole wizard and install screens but change nothing;
@@ -63,10 +64,10 @@ parse_args() {
       --cooling) PRE_COOLING=1 ;;
       --wallpapers) PRE_WALLPAPERS=1 ;;
       --cursors) PRE_CURSORS=1 ;;
-      --kde) PRE_KDE=1 ;;
+      --kde) PRE_KDE=1 ;;  # 2 means "from --all", which -D overrides
       --dankshell) PRE_DANK=1 ;;
       --update) PRE_UPDATE=1 ;;
-      --all) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1 PRE_KDE=1 ;;
+      --all) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1; (( PRE_KDE )) || PRE_KDE=2 ;;
       --dry-run) DRY_RUN=1 ;;
       --help) usage; exit 0 ;;
       --) (($#)) && { printf '%s: unexpected argument: %s\n' "${0##*/}" "$1" >&2; exit 2; }; break ;;
@@ -82,7 +83,7 @@ parse_args() {
             k) PRE_KDE=1 ;;
             D) PRE_DANK=1 ;;
             U) PRE_UPDATE=1 ;;
-            A) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1 PRE_KDE=1 ;;
+            A) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1; (( PRE_KDE )) || PRE_KDE=2 ;;
             n) DRY_RUN=1 ;;
             h) usage; exit 0 ;;
             *) printf '%s: unknown option: -%s\nTry --help.\n' "${0##*/}" "$flag" >&2; exit 2 ;;
@@ -161,7 +162,7 @@ AUR_COOLING_PACKAGES=( nct6687d-dkms-git )
 COOLER_AUR_INDEX=3
 COOLER_DAEMON_INDEX=1
 GHOSTTY_INDEX=1
-DESETUP_REPO='https://github.com/gkuba/DESetupLinux.git'
+DESETUP_REPO=${DESETUP_REPO:-https://github.com/gkuba/DESetupLinux.git}  # override to test unpushed changes
 COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
 
 PACKAGE_LABELS=( 'Extra desktop applications' 'CoolerControl and MSI sensor support' 'Full system update' )
@@ -179,7 +180,7 @@ ASSET_DETAILS=(
 DESKTOP_LABELS=( 'KDE Plasma configuration' 'Dank Shell' )
 DESKTOP_DETAILS=(
   "Oxygen style $G_SEP Breeze Dark $G_SEP Violet-Noir accent $G_SEP Ghostty terminal $G_SEP Num Lock $G_SEP PTT mouse buttons $G_SEP hourly wallpaper slideshow $G_SEP login and lock screen wallpaper"
-  "Hyprland $G_SEP Ghostty $G_SEP adw-gtk-theme $G_SEP dms-greeter, dsearch, dcal $G_SEP installed headless by duxinstall; the Hyprland config is replaced (backup kept)"
+  "Hyprland $G_SEP Ghostty $G_SEP dms-greeter $G_SEP Violet-Noir theme $G_SEP Empty-Butterfly-Purple cursor $G_SEP hourly wallpapers per monitor $G_SEP the Hyprland config is replaced (backup kept)"
 )
 DANK_INDEX=1
 DUX_INSTALL_URL='https://install.duxlabs.dev'
@@ -201,13 +202,13 @@ PARU_INSTALLED=0
 PARU_AVAILABLE=0
 PACKAGE_STATUS_READY=0
 
-PHASE_TITLES=( 'System update' 'Pacman packages' 'AUR packages' 'CoolerControl profile' 'Desktop assets' 'KDE Plasma configuration' 'Dank Shell' )
-PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_cooling_aur applyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig install_dank_shell )
-PHASE_DONE_TEXT=( 'System packages are up to date.' 'Selected pacman packages installed.' 'AUR packages installed.' 'CoolerControl profile applied and daemon enabled.' 'Desktop assets copied.' 'KDE Plasma configuration applied.' 'Dank Shell installed on Hyprland.' )
-PHASE_FATAL=( 1 1 0 0 0 0 0 )
-PHASE_STATE=( pending pending pending pending pending pending pending )
-PHASE_TIME=( '' '' '' '' '' '' '' )
-PHASE_RC=( 0 0 0 0 0 0 0 )
+PHASE_TITLES=( 'System update' 'Pacman packages' 'AUR packages' 'CoolerControl profile' 'Desktop assets' 'KDE Plasma configuration' 'Dank Shell' 'Dank Shell appearance' )
+PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_cooling_aur applyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig install_dank_shell apply_dank_shell_appearance )
+PHASE_DONE_TEXT=( 'System packages are up to date.' 'Selected pacman packages installed.' 'AUR packages installed.' 'CoolerControl profile applied and daemon enabled.' 'Desktop assets copied.' 'KDE Plasma configuration applied.' 'Dank Shell installed on Hyprland.' 'Violet-Noir theme, cursor, wallpapers and login screen applied.' )
+PHASE_FATAL=( 1 1 0 0 0 0 0 0 )
+PHASE_STATE=( pending pending pending pending pending pending pending pending )
+PHASE_TIME=( '' '' '' '' '' '' '' '' )
+PHASE_RC=( 0 0 0 0 0 0 0 0 )
 PHASE_COUNT=${#PHASE_TITLES[@]}
 STOP_REQUESTED=0
 REBOOT_REASON=''
@@ -555,6 +556,12 @@ check_package_status() {
 
 any_selected() { local v; for v in "$@"; do (( v )) && return 0; done; return 1; }
 
+# Dank Shell's appearance step uses the wallpapers and the cursor theme.
+require_desktop_assets() {
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && ASSET_SELECTED=(1 1)
+  return 0
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Wizard screens
 # ─────────────────────────────────────────────────────────────────────────────
@@ -611,9 +618,10 @@ show_welcome() {
   done
 }
 
-# draw_menu STEP TITLE INTRO LABELS DETAILS SELECTED -> 0 next, 1 quit, 2 back
+# draw_menu STEP TITLE INTRO LABELS DETAILS SELECTED [EXCLUSIVE] -> 0 next, 1 quit, 2 back
+# With EXCLUSIVE=1 at most one item can be selected and A (all) is not offered.
 draw_menu() {
-  local step=$1 title=$2 intro=$3
+  local step=$1 title=$2 intro=$3 exclusive=${7:-0}
   local -n labels_ref=$4 details_ref=$5 selected_ref=$6
   local cursor=0 i row line mark box label_color
   local -a wrapped=()
@@ -630,13 +638,22 @@ draw_menu() {
       for line in "${wrapped[@]}"; do put "$row" "    $DIM$line$RESET"; ((row++)); done
       ((row++))
     done
-    draw_footer "$G_UPDOWN" 'Move' 'Space' 'Toggle' 'A' 'All' 'N' 'None' 'Enter' 'Next' 'B' 'Back' 'Esc' 'Quit'
+    if (( exclusive )); then
+      draw_footer "$G_UPDOWN" 'Move' 'Space' 'Choose' 'N' 'None' 'Enter' 'Next' 'B' 'Back' 'Esc' 'Quit'
+    else
+      draw_footer "$G_UPDOWN" 'Move' 'Space' 'Toggle' 'A' 'All' 'N' 'None' 'Enter' 'Next' 'B' 'Back' 'Esc' 'Quit'
+    fi
     read_key || return 1
     case "$KEY" in
       UP|k|K) (( cursor > 0 )) && ((cursor--)) ;;
       DOWN|j|J) (( cursor + 1 < ${#labels_ref[@]} )) && ((cursor++)) ;;
-      SPACE) selected_ref[cursor]=$((1 - selected_ref[cursor])); log_event "Toggled ${labels_ref[cursor]} to ${selected_ref[cursor]}." ;;
-      a|A) for i in "${!selected_ref[@]}"; do selected_ref[i]=1; done ;;
+      SPACE)
+        selected_ref[cursor]=$((1 - selected_ref[cursor]))
+        if (( exclusive && selected_ref[cursor] )); then
+          for i in "${!selected_ref[@]}"; do (( i == cursor )) || selected_ref[i]=0; done
+        fi
+        log_event "Toggled ${labels_ref[cursor]} to ${selected_ref[cursor]}." ;;
+      a|A) (( exclusive )) || for i in "${!selected_ref[@]}"; do selected_ref[i]=1; done ;;
       n|N) for i in "${!selected_ref[@]}"; do selected_ref[i]=0; done ;;
       ENTER) log_event "Completed page: $title (${selected_ref[*]})."; return 0 ;;
       b|B|BACKSPACE) return 2 ;;
@@ -653,7 +670,8 @@ item_status() { # group index
     0) SEL=${APP_SELECTED[i]}; installed=${APP_INSTALLED[i]}
        (( i == GHOSTTY_INDEX && DESKTOP_SELECTED[0] )) && { SEL=1; required=1; } ;;
     1) SEL=${COOLER_SELECTED[i]}; installed=${COOLER_INSTALLED[i]} ;;
-    2) SEL=${ASSET_SELECTED[i]} ;;
+    2) SEL=${ASSET_SELECTED[i]}
+       (( DESKTOP_SELECTED[DANK_INDEX] )) && required=1 ;;
     3) SEL=${DESKTOP_SELECTED[i]} ;;
     4) SEL=${PACKAGE_SELECTED[UPDATE_INDEX]} ;;
   esac
@@ -666,6 +684,7 @@ item_status() { # group index
     (( g == 1 && i == COOLER_AUR_INDEX && SEL )) && ST_TEXT+=' **'
   else
     if (( SEL )); then ST_TEXT="+ apply" ST_COLOR=$GREEN; else ST_TEXT="$G_SKIP skip"; fi
+    (( required )) && ST_TEXT+=' *'
   fi
 }
 
@@ -730,6 +749,8 @@ show_selection_review() {
     row=$notes_row
     if (( DESKTOP_SELECTED[0] )); then
       put "$row" "${CYAN}*$RESET ${DIM}Ghostty is required by the KDE Plasma configuration.$RESET"; ((row++))
+    elif (( DESKTOP_SELECTED[DANK_INDEX] )); then
+      put "$row" "${CYAN}*$RESET ${DIM}Dank Shell uses the wallpapers and the Empty-Butterfly-Purple cursor.$RESET"; ((row++))
     fi
     if (( COOLER_SELECTED[COOLER_AUR_INDEX] )); then
       if (( PARU_INSTALLED )); then
@@ -766,8 +787,17 @@ show_selection_review() {
                APP_SELECTED[i]=$((1 - APP_SELECTED[i]))
              fi ;;
           1) COOLER_SELECTED[i]=$((1 - COOLER_SELECTED[i])) ;;
-          2) ASSET_SELECTED[i]=$((1 - ASSET_SELECTED[i])) ;;
-          3) DESKTOP_SELECTED[i]=$((1 - DESKTOP_SELECTED[i])) ;;
+          2) if (( DESKTOP_SELECTED[DANK_INDEX] )); then
+               log_event 'Desktop assets stay selected while Dank Shell is selected.'
+             else
+               ASSET_SELECTED[i]=$((1 - ASSET_SELECTED[i]))
+             fi ;;
+          3) DESKTOP_SELECTED[i]=$((1 - DESKTOP_SELECTED[i]))
+             # Only one desktop is set up per machine.
+             if (( DESKTOP_SELECTED[i] )); then
+               for x in "${!DESKTOP_SELECTED[@]}"; do (( x == i )) || DESKTOP_SELECTED[x]=0; done
+             fi
+             require_desktop_assets ;;
           4) PACKAGE_SELECTED[UPDATE_INDEX]=$((1 - PACKAGE_SELECTED[UPDATE_INDEX])) ;;
         esac
         log_event "Review toggle: ${rl[cursor]}."
@@ -777,15 +807,16 @@ show_selection_review() {
         case "$g" in
           0) if any_selected "${APP_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!APP_SELECTED[@]}"; do APP_SELECTED[i]=$x; done ;;
           1) if any_selected "${COOLER_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=$x; done ;;
-          2) if any_selected "${ASSET_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!ASSET_SELECTED[@]}"; do ASSET_SELECTED[i]=$x; done ;;
-          3) if any_selected "${DESKTOP_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!DESKTOP_SELECTED[@]}"; do DESKTOP_SELECTED[i]=$x; done ;;
+          2) if any_selected "${ASSET_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!ASSET_SELECTED[@]}"; do ASSET_SELECTED[i]=$x; done
+             require_desktop_assets ;;
+          3) DESKTOP_SELECTED=(0 0) ;;
           4) PACKAGE_SELECTED[UPDATE_INDEX]=$((1 - PACKAGE_SELECTED[UPDATE_INDEX])) ;;
         esac
         ;;
       a|A) for i in "${!APP_SELECTED[@]}"; do APP_SELECTED[i]=1; done; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=1; done
-           ASSET_SELECTED=(1 1); DESKTOP_SELECTED=(1 1); PACKAGE_SELECTED[UPDATE_INDEX]=1 ;;
+           ASSET_SELECTED=(1 1); DESKTOP_SELECTED=(1 0); PACKAGE_SELECTED[UPDATE_INDEX]=1 ;;
       n|N) for i in "${!APP_SELECTED[@]}"; do APP_SELECTED[i]=0; done; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=0; done
-           ASSET_SELECTED=(0 0); DESKTOP_SELECTED=(0 0); PACKAGE_SELECTED[UPDATE_INDEX]=0 ;;
+           ASSET_SELECTED=(0 0); DESKTOP_SELECTED=(0 0); PACKAGE_SELECTED[UPDATE_INDEX]=0; require_desktop_assets ;;
       ENTER) REVIEW_CURSOR=$cursor; log_event 'Selection review confirmed.'; return 0 ;;
       b|B|BACKSPACE) REVIEW_CURSOR=$cursor; return 2 ;;
       ESC|q|Q) return 1 ;;
@@ -880,10 +911,15 @@ build_plan() {
     fi
   fi
 
+  if (( DESKTOP_SELECTED[0] && DESKTOP_SELECTED[DANK_INDEX] )); then
+    PLAN_BLOCKERS+=('Choose either the KDE Plasma configuration or Dank Shell; only one desktop is set up per machine.')
+  fi
   if (( DESKTOP_SELECTED[DANK_INDEX] )); then
     if (( ADW_GTK_INSTALLED )); then notes=('adw-gtk-theme: installed'); else notes=('adw-gtk-theme: will install'); fi
     notes+=("Ghostty $G_SEP dms-greeter, dsearch, dcal $G_SEP existing Hyprland config backed up, then replaced")
     notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
+    notes+=("then Violet-Noir theme $G_SEP gradient borders, blur $G_SEP Empty-Butterfly-Purple cursor 48px")
+    notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
       x86_64|aarch64) ;;
@@ -1049,7 +1085,7 @@ show_completion() {
   lines+=('')
   if [[ -n "$REBOOT_REASON" ]]; then lines+=("$YELLOW$G_REBOOT $REBOOT_REASON$RESET"); fi
   if [[ "${PHASE_STATE[5]}" == ok ]]; then lines+=("$DIM$G_INFO Log out and back in to see every KDE change.$RESET"); fi
-  if [[ "${PHASE_STATE[6]}" == ok ]]; then lines+=("$DIM$G_INFO Log out and choose the Hyprland session to start Dank Shell.$RESET"); fi
+  if [[ "${PHASE_STATE[6]}" == ok && "${PHASE_STATE[7]}" == ok ]]; then lines+=("$DIM$G_INFO Log out and choose the Hyprland session to start Dank Shell.$RESET"); fi
   (( DRY_RUN )) && lines+=("$YELLOW$G_WARN Dry run: nothing was changed.$RESET")
   case "$outcome" in
     ok) title='Finished' ;;
@@ -1262,7 +1298,7 @@ phase_enabled() {
     4) (( COOLER_SELECTED[COOLER_DAEMON_INDEX] )) ;;
     5) any_selected "${ASSET_SELECTED[@]}" ;;
     6) (( DESKTOP_SELECTED[0] )) ;;
-    7) (( DESKTOP_SELECTED[DANK_INDEX] )) ;;
+    7|8) (( DESKTOP_SELECTED[DANK_INDEX] )) ;;
   esac
 }
 
@@ -1315,7 +1351,7 @@ install_selected_pacman_packages() {
     info 'Including paru from your repositories for the AUR sensor driver.'
   fi
   (( DESKTOP_SELECTED[0] )) && packages+=(oxygen)
-  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme)
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme jq)
   if ((${#packages[@]} == 0)); then
     info 'No pacman packages selected.'
     return 0
@@ -1660,6 +1696,177 @@ install_dank_shell() {
   success 'Dank Shell installed. Its own log is /tmp/duxinstall-<timestamp>.log.'
 }
 
+tilde() { printf '%s' "${1/#"$HOME"/\~}"; } # path -> path with $HOME shown as ~
+
+backup_user_file() { # file backup-dir -> copies file under backup-dir, keeping its path below $HOME
+  local file=$1 dir=$2 rel
+  [[ -e "$file" ]] || return 0
+  rel=${file#"$HOME"/}
+  run mkdir -p "$dir/${rel%/*}" || return 1
+  run cp -a -- "$file" "$dir/$rel" || return 1
+  info "Backed up ~/$rel"
+}
+
+install_user_file() { # source target backup-dir -> installs source, backing up a different target first
+  local src=$1 target=$2 dir=$3
+  if [[ -f "$target" ]] && cmp -s -- "$src" "$target"; then
+    success "$(tilde "$target") is already current."
+    return 0
+  fi
+  backup_user_file "$target" "$dir" || return 1
+  run install -D -m 0644 -- "$src" "$target" || return 1
+  success "Installed $(tilde "$target")"
+}
+
+append_line() { printf '\n%s\n' "$2" >> "$1"; } # file line
+
+write_json() { # target file holding the new JSON -> installs it, backing up the old one
+  local target=$1 new=$2 dir=$3
+  if [[ -f "$target" ]] && cmp -s -- "$new" "$target"; then
+    success "$(tilde "$target") is already current."
+    return 0
+  fi
+  backup_user_file "$target" "$dir" || return 1
+  run install -D -m 0644 -- "$new" "$target" || return 1
+  success "Updated $(tilde "$target")"
+}
+
+connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names outputs)
+  local status name
+  MONITORS=()
+  for status in /sys/class/drm/card*-*/status; do
+    [[ -r "$status" && "$(<"$status")" == connected ]] || continue
+    name=${status%/status}; name=${name##*/}
+    [[ "$name" =~ ^card[0-9]+-(.+)$ ]] && MONITORS+=("${BASH_REMATCH[1]}")
+  done
+}
+
+# Dank Shell reads its theme, cursor and wallpaper settings from settings.json
+# and session.json; dms-greeter sync links both into the login screen.
+apply_dank_shell_appearance() {
+  local scratch src backup_dir hypr_main settings session theme wall_dir new group rc=0 i pick
+  local require_line='require("violet-noir")'
+  local -a images=() pairs=() used=()
+  need_cmd git 'git is required to download DESetupLinux.' || return 1
+  need_cmd jq 'jq is required to edit the Dank Shell settings.' || return 1
+  hypr_main="$HOME/.config/hypr/hyprland.lua"
+  settings="$HOME/.config/dms/settings.json"
+  session="${XDG_STATE_HOME:-$HOME/.local/state}/dms/session.json"
+  theme="$HOME/.config/dms/themes/Violet-Noir.json"
+  wall_dir="$HOME/Pictures/Wallpapers"
+  if [[ ! -f "$hypr_main" ]] && (( ! DRY_RUN )); then
+    error 'Hyprland config not found at ~/.config/hypr/hyprland.lua; the Dank Shell install step must succeed first.'
+    return 1
+  fi
+
+  scratch=$(mktemp -d "${TMPDIR:-/tmp}/dankshell.XXXXXXXX") || return 1
+  info 'Downloading DESetupLinux.'
+  if ! git clone --depth=1 --quiet "$DESETUP_REPO" "$scratch/DESetupLinux"; then
+    rm -rf -- "$scratch"; error 'Could not download DESetupLinux.'; return 1
+  fi
+  src="$scratch/DESetupLinux/DankShell/.config"
+  if [[ ! -f "$src/dms/themes/Violet-Noir.json" || ! -f "$src/hypr/violet-noir.lua" ]]; then
+    rm -rf -- "$scratch"; error 'DESetupLinux is missing DankShell/.config (theme or Hyprland looks).'; return 1
+  fi
+  backup_dir="$HOME/.dotfiles-backup/dankshell-$(date +%Y%m%d-%H%M%S)"
+
+  # Theme and Hyprland looks.
+  install_user_file "$src/dms/themes/Violet-Noir.json" "$theme" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+  install_user_file "$src/hypr/violet-noir.lua" "$HOME/.config/hypr/violet-noir.lua" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+  if [[ -f "$hypr_main" ]] && grep -qxF "$require_line" "$hypr_main"; then
+    success 'hyprland.lua already loads violet-noir.lua.'
+  else
+    backup_user_file "$hypr_main" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+    run append_line "$hypr_main" "$require_line" || { rm -rf -- "$scratch"; return 1; }
+    success 'hyprland.lua loads violet-noir.lua last, after the Dank Shell fragments.'
+  fi
+
+  # Theme and cursor in settings.json; other settings are kept.
+  new="$scratch/settings.json"
+  if [[ -s "$settings" ]] && ! jq -e 'type == "object"' "$settings" >/dev/null 2>&1; then
+    rm -rf -- "$scratch"; error "$settings is not a JSON object; fix or remove it, then run this again."; return 1
+  fi
+  if ! { if [[ -s "$settings" ]]; then cat -- "$settings"; else printf '{}'; fi; } | jq --arg theme "$theme" '
+      .currentThemeName = "custom"
+      | .customThemeFile = $theme
+      | .cursorSettings = ((.cursorSettings // {}) + {theme: "Empty-Butterfly-Purple", size: 48})' > "$new"; then
+    rm -rf -- "$scratch"; error 'Could not build the Dank Shell settings.'; return 1
+  fi
+  write_json "$settings" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+
+  # A random wallpaper per monitor, each rotating randomly every hour.
+  for i in "$scratch/DESetupLinux/Wallpapers"/*; do
+    [[ -f "$i" ]] || continue
+    case "${i,,}" in *.png|*.jpg|*.jpeg|*.webp) images+=("$wall_dir/${i##*/}") ;; esac
+  done
+  if ((${#images[@]} == 0)); then
+    rm -rf -- "$scratch"; error 'DESetupLinux has no wallpapers to choose from.'; return 1
+  fi
+  connected_monitors
+  if ((${#MONITORS[@]} == 0)); then
+    warn 'No connected monitors found under /sys/class/drm; only the global wallpaper is set.'
+  fi
+  for i in "${MONITORS[@]}"; do
+    # Prefer a wallpaper no other monitor got yet.
+    ((${#used[@]} >= ${#images[@]})) && used=()
+    while :; do
+      pick=${images[RANDOM % ${#images[@]}]}
+      [[ " ${used[*]} " == *" $pick "* ]] || break
+    done
+    used+=("$pick")
+    pairs+=("$i" "$pick")
+    info "Monitor $i: ${pick##*/}"
+  done
+  new="$scratch/session.json"
+  if [[ -s "$session" ]] && ! jq -e 'type == "object"' "$session" >/dev/null 2>&1; then
+    rm -rf -- "$scratch"; error "$session is not a JSON object; fix or remove it, then run this again."; return 1
+  fi
+  if ! { if [[ -s "$session" ]]; then cat -- "$session"; else printf '{}'; fi; } \
+      | jq --arg dir "$wall_dir" --arg first "${pairs[1]:-${images[0]}}" \
+           --argjson walls "$(jq -n '$ARGS.positional as $p | reduce range(0; $p | length; 2) as $i ({}; .[$p[$i]] = $p[$i + 1])' --args "${pairs[@]}")" '
+      ({enabled: true, random: true, recursive: false, mode: "interval", interval: 3600, time: "06:00", folderPath: $dir}) as $cycle
+      | .wallpaperPath = $first
+      | .wallpaperCyclingEnabled = true
+      | .wallpaperCyclingRandom = true
+      | .wallpaperCyclingRecursive = false
+      | .wallpaperCyclingMode = "interval"
+      | .wallpaperCyclingInterval = 3600
+      | .wallpaperCyclingFolderPath = $dir
+      | .perMonitorWallpaper = ($walls | length > 0)
+      | .monitorWallpapers = ((.monitorWallpapers // {}) + $walls)
+      | .monitorCyclingSettings = ((.monitorCyclingSettings // {}) + ($walls | map_values($cycle)))' > "$new"; then
+    rm -rf -- "$scratch"; error 'Could not build the Dank Shell wallpaper settings.'; return 1
+  fi
+  write_json "$session" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
+  rm -rf -- "$scratch"
+
+  # Login screen: link the settings into the greeter, then let the greeter
+  # read the wallpapers, which dms-greeter sync does not cover.
+  if ! command -v dms-greeter >/dev/null 2>&1; then
+    if (( DRY_RUN )); then dry_note 'dms-greeter is not installed yet; a real run syncs the login screen here.'; return 0; fi
+    warn 'dms-greeter is not installed; the login screen was not synced.'
+    return 0
+  fi
+  info 'Syncing the login screen with dms-greeter.'
+  run dms-greeter sync --yes || rc=$?
+  for group in greeter greetd _greeter; do getent group "$group" >/dev/null 2>&1 && break; group=''; done
+  if [[ -z "$group" ]]; then
+    warn 'No greeter group found; the login screen may not be able to read ~/Pictures/Wallpapers.'
+  elif command -v setfacl >/dev/null 2>&1; then
+    run setfacl -m "g:$group:x" "$HOME" "$HOME/Pictures" || rc=1
+    run setfacl -R -m "g:$group:rX" "$wall_dir" || rc=1
+    run setfacl -d -m "g:$group:rX" "$wall_dir" || rc=1
+    (( rc )) || success "The $group group can read ~/Pictures/Wallpapers for the login screen."
+  else
+    warn 'setfacl is not installed; the login screen may not be able to read ~/Pictures/Wallpapers.'
+  fi
+  if (( rc )); then
+    error 'The login screen sync did not finish. Run "dms-greeter sync" in a terminal to see why.'
+    return "$rc"
+  fi
+  success 'Log out and back in once so the greeter group membership takes effect.'
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main flow
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1688,9 +1895,12 @@ apply_preselection() {
   (( PRE_COOLING )) && for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=1; done
   (( PRE_WALLPAPERS )) && ASSET_SELECTED[0]=1
   (( PRE_CURSORS )) && ASSET_SELECTED[1]=1
+  # Only one desktop per machine: Dank Shell replaces the KDE choice -A adds.
+  (( PRE_DANK && PRE_KDE == 2 )) && PRE_KDE=0
   (( PRE_KDE )) && DESKTOP_SELECTED[0]=1
   (( PRE_DANK )) && DESKTOP_SELECTED[DANK_INDEX]=1
   (( PRE_UPDATE )) && PACKAGE_SELECTED[UPDATE_INDEX]=1
+  require_desktop_assets
   sync_groups_from_items
   log_event "Preselected from options: apps=$PRE_APPS cooling=$PRE_COOLING wallpapers=$PRE_WALLPAPERS cursors=$PRE_CURSORS kde=$PRE_KDE dankshell=$PRE_DANK update=$PRE_UPDATE"
 }
@@ -1732,8 +1942,9 @@ main() {
         ;;
       3)
         result=0
-        draw_menu 3 'Desktop themes' 'Choose optional desktop setups. Both can be installed side by side.' \
-          DESKTOP_LABELS DESKTOP_DETAILS DESKTOP_SELECTED || result=$?
+        draw_menu 3 'Desktop themes' 'Choose one desktop setup; only one is set up per machine.' \
+          DESKTOP_LABELS DESKTOP_DETAILS DESKTOP_SELECTED 1 || result=$?
+        require_desktop_assets
         (( result == 1 )) && return 0
         (( result == 2 )) && { stage=2; continue; }
         stage=4
