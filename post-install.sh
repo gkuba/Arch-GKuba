@@ -918,7 +918,7 @@ build_plan() {
     if (( ADW_GTK_INSTALLED )); then notes=('adw-gtk-theme: installed'); else notes=('adw-gtk-theme: will install'); fi
     notes+=("Ghostty $G_SEP dms-greeter, dsearch, dcal $G_SEP existing Hyprland config backed up, then replaced")
     notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
-    notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP glassy windows, xray blur $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin in Breeze Dark")
+    notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP glassy windows, xray blur $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin follows the theme")
     notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
@@ -1351,7 +1351,7 @@ install_selected_pacman_packages() {
     info 'Including paru from your repositories for the AUR sensor driver.'
   fi
   (( DESKTOP_SELECTED[0] )) && packages+=(oxygen)
-  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme breeze jq)
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme kconfig jq)
   if ((${#packages[@]} == 0)); then
     info 'No pacman packages selected.'
     return 0
@@ -1869,18 +1869,19 @@ apply_dank_shell_appearance() {
   fi
   install_generated "$session" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
 
-  # Outside Plasma, KDE apps ignore the kdeglobals color scheme; Dolphin keeps
-  # its own in dolphinrc. BreezeDark.colors comes from the breeze package.
+  # Outside Plasma, Dolphin keeps its color scheme in dolphinrc. Dank Shell
+  # writes DankMatugen.colors from the active theme (Violet-Noir) on every
+  # theme change, so Dolphin follows it. kwriteconfig6 comes with kconfig.
   if command -v kwriteconfig6 >/dev/null 2>&1; then
-    if run kwriteconfig6 --file dolphinrc --group UiSettings --key ColorScheme BreezeDark; then
-      success 'Set Dolphin to Breeze Dark.'
+    if run kwriteconfig6 --file dolphinrc --group UiSettings --key ColorScheme DankMatugen; then
+      success "Set Dolphin to Dank Shell's color scheme."
     else
       rc=1
     fi
   elif (( DRY_RUN )); then
-    dry_note 'kwriteconfig6 is not installed yet; a real run sets Dolphin to Breeze Dark here.'
+    dry_note "kwriteconfig6 is not installed yet; a real run sets Dolphin to Dank Shell's color scheme here."
   else
-    warn 'kwriteconfig6 is not installed; Dolphin keeps its default colors.'
+    warn "kwriteconfig6 is not installed; Dolphin keeps its default colors."
   fi
 
   # Login screen: link the settings into the greeter, then let the greeter

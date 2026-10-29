@@ -191,7 +191,7 @@ curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-f
 
 - installs Hyprland, Ghostty, Dank Shell (dms), quickshell and its other
   dependencies, plus the optional dms-greeter, dsearch and dcal
-  (`--all-features`); `adw-gtk-theme` and `breeze` are installed in the pacman
+  (`--all-features`); `adw-gtk-theme` and `kconfig` are installed in the pacman
   step;
 - replaces only the Hyprland config, after backing up the existing one; an
   existing Ghostty config is kept;
@@ -228,8 +228,9 @@ first, and running it again changes nothing that is already current:
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
   in random order every hour (monitor names come from `/sys/class/drm`);
-- sets Dolphin to Breeze Dark in `~/.config/dolphinrc`, since KDE apps
-  outside Plasma ignore the system color scheme;
+- sets Dolphin's window color scheme to Dank Shell's `DankMatugen` in
+  `~/.config/dolphinrc`; Dank Shell regenerates that scheme from the active
+  theme, so Dolphin follows Violet-Noir (and any later theme change);
 - runs `dms-greeter sync --yes` so the login screen uses the same theme and
   each monitor's current wallpaper, then lets the greeter group read
   `~/Pictures/Wallpapers` with ACLs, which the sync does not cover;
