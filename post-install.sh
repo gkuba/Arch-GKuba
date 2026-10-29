@@ -1358,7 +1358,9 @@ install_selected_pacman_packages() {
     info 'Including paru from your repositories for the AUR packages.'
   fi
   (( DESKTOP_SELECTED[0] )) && packages+=(oxygen)
-  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme breeze jq)
+  # duxinstall leaves out Hyprland's portal backend, which serves global
+  # shortcuts (Discord's keybinds) and screen sharing.
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme breeze jq xdg-desktop-portal-hyprland)
   if ((${#packages[@]} == 0)); then
     info 'No pacman packages selected.'
     return 0
@@ -1756,7 +1758,7 @@ connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names out
 # Dank Shell reads its theme, cursor and wallpaper settings from settings.json
 # and session.json; dms-greeter sync links both into the login screen.
 apply_dank_shell_appearance() {
-  local scratch src backup_dir hypr_main settings session layout qt_config theme wall_dir new group rc=0 step_rc i pick
+  local scratch src backup_dir hypr_main settings session layout qt_config bin_dir theme wall_dir new group rc=0 step_rc i pick
   local -a qt5_plugins=()
   local cursor=Empty-Butterfly-Purple cursor_size=32
   local require_line
@@ -1798,6 +1800,19 @@ apply_dank_shell_appearance() {
       success "hyprland.lua loads $i.lua last, after the Dank Shell fragments."
     fi
   done
+  # discord-ptt-key assigns F14 as Discord's push-to-talk key (no keyboard has
+  # it); its launcher entry gets the full path, since the launcher's PATH may
+  # lack ~/.local/bin.
+  bin_dir="$HOME/.local/bin"
+  if [[ -f "$scratch/DESetupLinux/DankShell/.local/bin/discord-ptt-key" ]]; then
+    install_user_file "$scratch/DESetupLinux/DankShell/.local/bin/discord-ptt-key" "$bin_dir/discord-ptt-key" "$backup_dir" \
+      && run chmod 0755 "$bin_dir/discord-ptt-key" || rc=1
+    new="$scratch/discord-ptt-key.desktop"
+    sed "s|@BIN@|$bin_dir|" "$scratch/DESetupLinux/DankShell/.local/share/applications/discord-ptt-key.desktop" > "$new" \
+      && install_generated "${XDG_DATA_HOME:-$HOME/.local/share}/applications/discord-ptt-key.desktop" "$new" "$backup_dir" || rc=1
+  else
+    warn 'DESetupLinux has no discord-ptt-key; assign Discord push-to-talk by hand.'
+  fi
 
   # Theme and cursor in settings.json; other settings are kept.
   new="$scratch/settings.json"

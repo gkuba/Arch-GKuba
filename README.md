@@ -195,7 +195,10 @@ curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-f
   style) are installed in the pacman step, and `qtengine` (Qt theming, from
   the AUR with `paru`) in the AUR step, as Dank Shell's
   [application themes docs](https://duxlabs.dev/docs/dms/application-themes)
-  require;
+  require. `xdg-desktop-portal-hyprland` is installed in the pacman step as
+  well: duxinstall leaves it out, and without it native Wayland apps get no
+  global shortcuts (Discord's keybinds, push-to-talk) or Hyprland screen
+  sharing;
 - replaces only the Hyprland config, after backing up the existing one; an
   existing Ghostty config is kept;
 - uses the sudo session this script already holds (`--privesc sudo`), so it
@@ -227,7 +230,8 @@ first, and running it again changes nothing that is already current:
   opacity slider, and `~/.config/hypr/discord-ptt.lua`, which binds the forward
   mouse button to Discord's global push-to-talk shortcut so it works
   whichever window is focused (Discord needs a keyboard key assigned to
-  push-to-talk to register that shortcut); both load at the end of `hyprland.lua`, after the Dank
+  push-to-talk to register that shortcut; `~/.local/bin/discord-ptt-key`, also
+  in the launcher as "Discord Push-to-Talk Key", assigns F14 to it); both load at the end of `hyprland.lua`, after the Dank
   Shell fragments;
 - turns on Dank Shell's Xray blur for its bar and popups by adding its rule
   to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle;
