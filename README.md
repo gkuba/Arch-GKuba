@@ -224,9 +224,10 @@ first, and running it again changes nothing that is already current:
 - installs `~/.config/hypr/violet-noir.lua` (gradient border, glassy windows
   at 90% focused and 82% unfocused, xray blur so windows blur the wallpaper
   rather than the windows beneath), which overrides Dank Shell's Window
-  opacity slider, and `~/.config/hypr/discord-ptt.lua`, which passes the side
-  mouse buttons (Mouse4, Mouse5) to Discord so push-to-talk works whichever
-  window is focused; both load at the end of `hyprland.lua`, after the Dank
+  opacity slider, and `~/.config/hypr/discord-ptt.lua`, which binds the forward
+  mouse button to Discord's global push-to-talk shortcut so it works
+  whichever window is focused (Discord needs a keyboard key assigned to
+  push-to-talk to register that shortcut); both load at the end of `hyprland.lua`, after the Dank
   Shell fragments;
 - turns on Dank Shell's Xray blur for its bar and popups by adding its rule
   to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle;
