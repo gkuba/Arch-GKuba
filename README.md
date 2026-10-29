@@ -211,16 +211,24 @@ first, and running it again changes nothing that is already current:
 
 - installs the Violet-Noir custom theme to `~/.config/dms/themes/` and selects
   it in `~/.config/dms/settings.json`, together with the
-  Empty-Butterfly-Purple cursor at 48px (`cursorSettings`), keeping every
-  other setting;
+  Empty-Butterfly-Purple cursor at 48px (`cursorSettings`) and the Fit
+  wallpaper mode for the desktop and login screen, keeping every other
+  setting;
+- writes the cursor to `~/.config/hypr/dms/cursor.lua` and `~/.Xresources`
+  with the same content Dank Shell writes, because Dank Shell only writes them
+  when the cursor is changed in its Settings;
 - installs `~/.config/hypr/violet-noir.lua` (gradient border, opacity, blur)
   and loads it at the end of `hyprland.lua`, after the Dank Shell fragments;
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
-  wallpaper from `~/Pictures/Wallpapers` and rotates each one in random order
-  every hour (monitor names come from `/sys/class/drm`);
+  wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
+  in random order every hour (monitor names come from `/sys/class/drm`);
 - runs `dms-greeter sync --yes` so the login screen uses the same theme and
   each monitor's current wallpaper, then lets the greeter group read
-  `~/Pictures/Wallpapers` with ACLs, which the sync does not cover.
+  `~/Pictures/Wallpapers` with ACLs, which the sync does not cover;
+- preselects the plain Hyprland session (not Hyprland with uwsm) on the login
+  screen, unless another session was chosen there since. The sync's auto-login
+  warning about `memory.json` on the first run is harmless: the group change
+  only applies after logging out.
 
 Log out (once more if the greeter group was just added) and choose the
 Hyprland session to start it. If Dank Shell is already running while the step
