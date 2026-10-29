@@ -1,9 +1,10 @@
 # Arch-GKuba Post-Install
 
 A personal post-install wizard for Arch-based systems, including CachyOS. It
-updates the system, installs optional package groups, copies desktop assets,
-and can apply a KDE Plasma configuration — all from an interactive terminal UI
-with a review step before anything changes.
+installs optional package groups, copies desktop assets, can apply a KDE
+Plasma configuration, install Dank Shell on Hyprland, and run a full system
+update — all from an interactive terminal UI with a review step before
+anything changes.
 
 Run it as your regular user. The script uses `sudo` only for system package,
 service, and configuration changes; you enter your password once and the
@@ -32,9 +33,10 @@ available.
 
 ## How the wizard works
 
-1. **Packages** — choose the optional package groups.
+1. **Packages and updates** — choose the optional package groups and the full
+   system update.
 2. **Desktop assets** — choose wallpapers and/or cursor themes.
-3. **Desktop themes** — choose the KDE Plasma configuration.
+3. **Desktop themes** — choose the KDE Plasma configuration and/or Dank Shell.
 4. **Review selections** — fine-tune individual packages and items. Each one
    shows whether it is already installed on this system.
 5. **Review the plan** — a summary of everything the run will do. Problems
@@ -48,12 +50,13 @@ Installation then runs step by step, with live output in a frame:
 
 | Step | Runs when |
 | --- | --- |
-| System update (`pacman -Syu`) | Always |
-| Pacman packages | Any package or KDE configuration is selected |
+| System update (`pacman -Syu`) | The system update is selected |
+| Pacman packages | Any package, KDE configuration or Dank Shell is selected |
 | AUR packages | The MSI sensor driver is selected |
 | CoolerControl profile | The CoolerControl daemon is selected |
 | Desktop assets | Wallpapers or cursor themes are selected |
 | KDE Plasma configuration | KDE Plasma configuration is selected |
+| Dank Shell | Dank Shell is selected |
 
 - A step that succeeds continues automatically after a short pause.
 - If the system update or pacman package step fails, the run stops there.
@@ -90,7 +93,9 @@ the full log. The log path is shown on screen (under `/tmp`).
 -w, --wallpapers   Copy DESetupLinux wallpapers into ~/Pictures/Wallpapers
 -u, --cursors      Copy DESetupLinux cursor themes into ~/.icons
 -k, --kde          KDE Plasma configuration
--A, --all          Everything above
+-D, --dankshell    Dank Shell on Hyprland with Ghostty (DuxLabs headless installer)
+-U, --update       Full system update (pacman -Syu) before anything else
+-A, --all          -a, -c, -w, -u and -k (add -D for Dank Shell, -U for a system update)
 -n, --dry-run      Run the whole wizard and install screens but change nothing
 -h, --help         Show help
 ```
@@ -101,7 +106,8 @@ Short options can be combined:
 
 ```bash
 ./post-install.sh -ak      # apps + KDE, starting at review
-./post-install.sh -An      # everything, dry run
+./post-install.sh -An      # all selections except Dank Shell and the update, dry run
+./post-install.sh -DU      # Dank Shell after a full system update
 ```
 
 `DRY_RUN=1 ./post-install.sh` also enables a dry run. In a dry run every
@@ -110,6 +116,16 @@ executed; read-only checks (package status, downloads into a temporary
 directory) still run so you can see what a real run would find.
 
 ## What each selection does
+
+### Packages and the system update
+
+The system update is off by default. Without it, package installs still sync
+the package databases and upgrade the system in the same transaction
+(`pacman -Syu --needed`), because syncing without upgrading would be a partial
+upgrade, which Arch does not support. Packages that are already installed are
+skipped, and when nothing needs installing, nothing is synced or upgraded.
+With the system update selected, it runs first (`pacman -Syu`) and later
+installs use `pacman -S --needed`.
 
 ### Extra desktop applications
 
@@ -162,7 +178,31 @@ Existing KDE configuration files (and `/etc/plasmalogin.conf`) are backed up to
 checked; the step reports how many failed, if any. Log out and back in to see
 every change.
 
+### Dank Shell
+
+Installs Dank Shell on Hyprland with the
+[DuxLabs headless installer](https://duxlabs.dev/docs/duxinstall), the same as:
+
+```bash
+curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-features --replace-configs hyprland --privesc sudo -y
+```
+
+- installs Hyprland, Ghostty, Dank Shell (dms), quickshell and its other
+  dependencies, plus the optional dms-greeter, dsearch and dcal
+  (`--all-features`); `adw-gtk-theme` is installed in the pacman step;
+- replaces only the Hyprland config, after backing up the existing one; an
+  existing Ghostty config is kept;
+- uses the sudo session this script already holds (`--privesc sudo`), so it
+  never prompts. Without the system update selected, the step syncs and
+  upgrades first so duxinstall never installs onto stale package databases;
+- the bootstrap script verifies the installer binary's SHA-256 checksum
+  before running it, and duxinstall writes its own log to
+  `/tmp/duxinstall-<timestamp>.log`.
+
+It does not need a Plasma session and can be installed alongside the KDE
+configuration. Log out and choose the Hyprland session to start it.
+
 ## After running
 
-If the system update installed a new kernel, or the MSI sensor driver was just
+If a package step installed a new kernel, or the MSI sensor driver was just
 built, reboot to load it. The completion screen tells you when this applies.

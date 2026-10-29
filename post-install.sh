@@ -18,7 +18,7 @@ shopt -s extglob
 DRY_RUN=${DRY_RUN:-0}
 [[ "$DRY_RUN" == 1 ]] || DRY_RUN=0
 PRESELECT=0
-PRE_APPS=0 PRE_COOLING=0 PRE_WALLPAPERS=0 PRE_CURSORS=0 PRE_KDE=0
+PRE_APPS=0 PRE_COOLING=0 PRE_WALLPAPERS=0 PRE_CURSORS=0 PRE_KDE=0 PRE_DANK=0 PRE_UPDATE=0
 
 usage() {
   cat <<EOF
@@ -36,7 +36,9 @@ Selections:
   -w, --wallpapers   Copy DESetupLinux wallpapers into ~/Pictures/Wallpapers
   -u, --cursors      Copy DESetupLinux cursor themes into ~/.icons
   -k, --kde          KDE Plasma configuration (Oxygen, Breeze Dark, Violet-Noir, Ghostty)
-  -A, --all          Everything above
+  -D, --dankshell    Dank Shell on Hyprland with Ghostty, via the DuxLabs headless installer
+  -U, --update       Full system update (pacman -Syu) before anything else
+  -A, --all          -a, -c, -w, -u and -k (add -D for Dank Shell, -U for a system update)
 
 Other:
   -n, --dry-run      Run the whole wizard and install screens but change nothing;
@@ -46,7 +48,9 @@ Other:
 
 Short options can be combined, e.g. ${0##*/} -akn
 
-Every run starts with a full system update (pacman -Syu).
+Package installs always sync and upgrade together (pacman -Syu --needed), so
+the system is never left partially upgraded. Packages that are already
+installed are skipped, and nothing is synced when there is nothing to install.
 EOF
 }
 
@@ -60,6 +64,8 @@ parse_args() {
       --wallpapers) PRE_WALLPAPERS=1 ;;
       --cursors) PRE_CURSORS=1 ;;
       --kde) PRE_KDE=1 ;;
+      --dankshell) PRE_DANK=1 ;;
+      --update) PRE_UPDATE=1 ;;
       --all) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1 PRE_KDE=1 ;;
       --dry-run) DRY_RUN=1 ;;
       --help) usage; exit 0 ;;
@@ -74,6 +80,8 @@ parse_args() {
             w) PRE_WALLPAPERS=1 ;;
             u) PRE_CURSORS=1 ;;
             k) PRE_KDE=1 ;;
+            D) PRE_DANK=1 ;;
+            U) PRE_UPDATE=1 ;;
             A) PRE_APPS=1 PRE_COOLING=1 PRE_WALLPAPERS=1 PRE_CURSORS=1 PRE_KDE=1 ;;
             n) DRY_RUN=1 ;;
             h) usage; exit 0 ;;
@@ -84,7 +92,7 @@ parse_args() {
       *) printf '%s: unexpected argument: %s\nTry --help.\n' "${0##*/}" "$arg" >&2; exit 2 ;;
     esac
   done
-  (( PRE_APPS || PRE_COOLING || PRE_WALLPAPERS || PRE_CURSORS || PRE_KDE )) && PRESELECT=1
+  (( PRE_APPS || PRE_COOLING || PRE_WALLPAPERS || PRE_CURSORS || PRE_KDE || PRE_DANK || PRE_UPDATE )) && PRESELECT=1
   return 0
 }
 
@@ -156,42 +164,51 @@ GHOSTTY_INDEX=1
 DESETUP_REPO='https://github.com/gkuba/DESetupLinux.git'
 COOLERCONTROL_CONFIG_URL='https://raw.githubusercontent.com/gkuba/DESetupLinux/refs/heads/main/coolercontrol/config.toml'
 
-PACKAGE_LABELS=( 'Extra desktop applications' 'CoolerControl and MSI sensor support' )
+PACKAGE_LABELS=( 'Extra desktop applications' 'CoolerControl and MSI sensor support' 'Full system update' )
 PACKAGE_DETAILS=(
   "discord $G_SEP ghostty $G_SEP obsidian $G_SEP vivaldi $G_SEP spotify-launcher $G_SEP solaar"
   "coolercontrol $G_SEP coolercontrold $G_SEP liquidctl $G_SEP nct6687d-dkms-git (AUR, needs paru)"
+  'pacman -Syu first. Without it, package installs still sync and upgrade (pacman -Syu --needed).'
 )
+UPDATE_INDEX=2   # PACKAGE_SELECTED[UPDATE_INDEX] is the system update, not a package group
 ASSET_LABELS=( 'Wallpapers' 'Cursor themes' )
 ASSET_DETAILS=(
   'Copy DESetupLinux wallpapers into ~/Pictures/Wallpapers'
   'Copy DESetupLinux cursor themes (Empty-Butterfly-Purple) into ~/.icons'
 )
-DESKTOP_LABELS=( 'KDE Plasma configuration' )
+DESKTOP_LABELS=( 'KDE Plasma configuration' 'Dank Shell' )
 DESKTOP_DETAILS=(
   "Oxygen style $G_SEP Breeze Dark $G_SEP Violet-Noir accent $G_SEP Ghostty terminal $G_SEP Num Lock $G_SEP PTT mouse buttons $G_SEP hourly wallpaper slideshow $G_SEP login and lock screen wallpaper"
+  "Hyprland $G_SEP Ghostty $G_SEP adw-gtk-theme $G_SEP dms-greeter, dsearch, dcal $G_SEP installed headless by duxinstall; the Hyprland config is replaced (backup kept)"
 )
-GROUP_TITLES=( 'Desktop applications' 'CoolerControl & MSI sensors' 'Desktop assets' 'Desktop themes' )
+DANK_INDEX=1
+DUX_INSTALL_URL='https://install.duxlabs.dev'
+# Headless duxinstall: https://duxlabs.dev/docs/duxinstall
+DUX_INSTALL_ARGS=( -c hyprland -t ghostty --all-features --replace-configs hyprland --privesc sudo -y )
+GROUP_TITLES=( 'Desktop applications' 'CoolerControl & MSI sensors' 'Desktop assets' 'Desktop themes' 'System' )
 
-PACKAGE_SELECTED=(0 0)
-PACKAGE_PREVIOUS=(0 0)
-DESKTOP_SELECTED=(0)
+PACKAGE_SELECTED=(0 0 0)
+PACKAGE_PREVIOUS=(0 0 0)
+DESKTOP_SELECTED=(0 0)
 ASSET_SELECTED=(0 0)
 APP_SELECTED=(0 0 0 0 0 0)
 COOLER_SELECTED=(0 0 0 0)
 APP_INSTALLED=(0 0 0 0 0 0)
 COOLER_INSTALLED=(0 0 0 0)
 KDE_OXYGEN_INSTALLED=0
+ADW_GTK_INSTALLED=0
 PARU_INSTALLED=0
 PARU_AVAILABLE=0
 PACKAGE_STATUS_READY=0
 
-PHASE_TITLES=( 'System update' 'Pacman packages' 'AUR packages' 'CoolerControl profile' 'Desktop assets' 'KDE Plasma configuration' )
-PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_cooling_aur applyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig )
-PHASE_DONE_TEXT=( 'System packages are up to date.' 'Selected pacman packages installed.' 'AUR packages installed.' 'CoolerControl profile applied and daemon enabled.' 'Desktop assets copied.' 'KDE Plasma configuration applied.' )
-PHASE_FATAL=( 1 1 0 0 0 0 )
-PHASE_STATE=( pending pending pending pending pending pending )
-PHASE_TIME=( '' '' '' '' '' '' )
-PHASE_RC=( 0 0 0 0 0 0 )
+PHASE_TITLES=( 'System update' 'Pacman packages' 'AUR packages' 'CoolerControl profile' 'Desktop assets' 'KDE Plasma configuration' 'Dank Shell' )
+PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_cooling_aur applyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig install_dank_shell )
+PHASE_DONE_TEXT=( 'System packages are up to date.' 'Selected pacman packages installed.' 'AUR packages installed.' 'CoolerControl profile applied and daemon enabled.' 'Desktop assets copied.' 'KDE Plasma configuration applied.' 'Dank Shell installed on Hyprland.' )
+PHASE_FATAL=( 1 1 0 0 0 0 0 )
+PHASE_STATE=( pending pending pending pending pending pending pending )
+PHASE_TIME=( '' '' '' '' '' '' '' )
+PHASE_RC=( 0 0 0 0 0 0 0 )
+PHASE_COUNT=${#PHASE_TITLES[@]}
 STOP_REQUESTED=0
 REBOOT_REASON=''
 SUDO_KEEPALIVE_PID=''
@@ -463,12 +480,31 @@ run() {
   "$@"
 }
 as_root() { run sudo -n "$@"; }
-pacman_install() { # packages...
+pacman_root() { # pacman arguments...
   if command -v stdbuf >/dev/null 2>&1; then
-    as_root stdbuf -oL -eL pacman -S --needed --noconfirm --color never "$@"
+    as_root stdbuf -oL -eL pacman --noconfirm --color never "$@"
   else
-    as_root pacman -S --needed --noconfirm --color never "$@"
+    as_root pacman --noconfirm --color never "$@"
   fi
+}
+# Installing from stale package databases risks a partial upgrade, which Arch
+# does not support. Without the system update step, every install syncs and
+# upgrades in the same transaction; after it, the databases are already fresh.
+pacman_install() { # packages...
+  if (( PACKAGE_SELECTED[UPDATE_INDEX] )); then
+    pacman_root -S --needed "$@"
+  else
+    pacman_root -Syu --needed "$@"
+  fi
+}
+split_installed() { # packages... -> MISSING_PACKAGES INSTALLED_PACKAGES
+  local name
+  local -A have=()
+  MISSING_PACKAGES=() INSTALLED_PACKAGES=()
+  while IFS= read -r name; do [[ -n "$name" ]] && have[$name]=1; done < <(pacman -Qq "$@" 2>/dev/null)
+  for name in "$@"; do
+    if [[ -n "${have[$name]:-}" ]]; then INSTALLED_PACKAGES+=("$name"); else MISSING_PACKAGES+=("$name"); fi
+  done
 }
 dry_note() { (( DRY_RUN )) && printf '%s dry run: %s\n' "$G_RUN" "$*"; return 0; }
 
@@ -506,11 +542,12 @@ check_package_status() {
   local -A have=()
   local name i
   while IFS= read -r name; do [[ -n "$name" ]] && have[$name]=1; done \
-    < <(pacman -Qq "${APP_ITEMS[@]}" "${COOLER_ITEMS[@]}" paru oxygen 2>/dev/null)
+    < <(pacman -Qq "${APP_ITEMS[@]}" "${COOLER_ITEMS[@]}" paru oxygen adw-gtk-theme 2>/dev/null)
   for i in "${!APP_ITEMS[@]}"; do APP_INSTALLED[i]=${have[${APP_ITEMS[i]}]:-0}; done
   for i in "${!COOLER_ITEMS[@]}"; do COOLER_INSTALLED[i]=${have[${COOLER_ITEMS[i]}]:-0}; done
   PARU_INSTALLED=${have[paru]:-0}
   KDE_OXYGEN_INSTALLED=${have[oxygen]:-0}
+  ADW_GTK_INSTALLED=${have[adw-gtk-theme]:-0}
   if (( PARU_INSTALLED )) || pacman -Si paru >/dev/null 2>&1; then PARU_AVAILABLE=1; else PARU_AVAILABLE=0; fi
   PACKAGE_STATUS_READY=1
   log_event "Package status: apps=${APP_INSTALLED[*]} cooling=${COOLER_INSTALLED[*]} paru=$PARU_INSTALLED/$PARU_AVAILABLE oxygen=$KDE_OXYGEN_INSTALLED"
@@ -551,12 +588,13 @@ show_welcome() {
     put 7 "$BLUE${BOLD}What this installer can set up$RESET"
     put 8 "  $PINK$G_DIAMOND$RESET $(pad "${LAVENDER}${BOLD}Extra packages$RESET" 18)${DIM}desktop apps, CoolerControl, MSI sensor driver$RESET"
     put 9 "  $PINK$G_DIAMOND$RESET $(pad "${LAVENDER}${BOLD}Desktop assets$RESET" 18)${DIM}wallpapers and cursor themes$RESET"
-    put 10 "  $PINK$G_DIAMOND$RESET $(pad "${LAVENDER}${BOLD}Desktop themes$RESET" 18)${DIM}KDE Plasma configuration$RESET"
-    put 12 "$BLUE${BOLD}How it works$RESET"
-    put 13 "  ${CYAN}1$RESET Choose  $DIM$G_RUN$RESET  ${CYAN}2$RESET Review  $DIM$G_RUN$RESET  ${CYAN}3$RESET Authenticate  $DIM$G_RUN$RESET  ${CYAN}4$RESET Install"
-    put 14 "  ${DIM}Nothing changes until you confirm the plan and enter your password.$RESET"
-    put 15 "  ${DIM}Existing configs are backed up under ~/.dotfiles-backup/ first.$RESET"
-    row=17
+    put 10 "  $PINK$G_DIAMOND$RESET $(pad "${LAVENDER}${BOLD}Desktop themes$RESET" 18)${DIM}KDE Plasma configuration, Dank Shell on Hyprland$RESET"
+    put 11 "  $PINK$G_DIAMOND$RESET $(pad "${LAVENDER}${BOLD}System update$RESET" 18)${DIM}optional full pacman -Syu$RESET"
+    put 13 "$BLUE${BOLD}How it works$RESET"
+    put 14 "  ${CYAN}1$RESET Choose  $DIM$G_RUN$RESET  ${CYAN}2$RESET Review  $DIM$G_RUN$RESET  ${CYAN}3$RESET Authenticate  $DIM$G_RUN$RESET  ${CYAN}4$RESET Install"
+    put 15 "  ${DIM}Nothing changes until you confirm the plan and enter your password.$RESET"
+    put 16 "  ${DIM}Existing configs are backed up under ~/.dotfiles-backup/ first.$RESET"
+    row=18
     if (( DRY_RUN )); then
       put "$row" "$YELLOW$BOLD$G_WARN Dry run:$RESET$YELLOW commands are shown, nothing is changed.$RESET"; ((row++))
     fi
@@ -617,6 +655,7 @@ item_status() { # group index
     1) SEL=${COOLER_SELECTED[i]}; installed=${COOLER_INSTALLED[i]} ;;
     2) SEL=${ASSET_SELECTED[i]} ;;
     3) SEL=${DESKTOP_SELECTED[i]} ;;
+    4) SEL=${PACKAGE_SELECTED[UPDATE_INDEX]} ;;
   esac
   if (( g <= 1 )); then
     if (( installed )); then ST_TEXT="$G_OK installed" ST_COLOR=$DIM$GREEN
@@ -637,16 +676,23 @@ show_selection_review() {
   for i in "${!COOLER_ITEMS[@]}"; do rg+=(1); ri+=("$i"); rl+=("${COOLER_ITEMS[i]}"); done
   for i in "${!ASSET_LABELS[@]}"; do rg+=(2); ri+=("$i"); rl+=("${ASSET_LABELS[i]}"); done
   for i in "${!DESKTOP_LABELS[@]}"; do rg+=(3); ri+=("$i"); rl+=("${DESKTOP_LABELS[i]}"); done
-  # Two columns: applications on the left, everything else on the right.
-  r=7; hg+=(0); hc+=(0); hr+=("$r"); ((r++))
-  for i in "${!rg[@]}"; do (( rg[i] == 0 )) && { rcol[i]=0; rr[i]=$r; ((r++)); }; done
+  rg+=(4); ri+=(0); rl+=('System update')
+  # Two columns: applications and desktop themes on the left, everything else
+  # on the right.
   r=7
-  for g in 1 2 3; do
+  for g in 0 3; do
+    hg+=("$g"); hc+=(0); hr+=("$r"); ((r++))
+    for i in "${!rg[@]}"; do (( rg[i] == g )) && { rcol[i]=0; rr[i]=$r; ((r++)); }; done
+    ((r++))
+  done
+  notes_row=$r
+  r=7
+  for g in 1 2 4; do
     hg+=("$g"); hc+=(1); hr+=("$r"); ((r++))
     for i in "${!rg[@]}"; do (( rg[i] == g )) && { rcol[i]=1; rr[i]=$r; ((r++)); }; done
     ((r++))
   done
-  notes_row=$r
+  (( r > notes_row )) && notes_row=$r
   log_event 'Step 04/06: Review selections.'
   while :; do
     draw_header 'Review selections' Step 4 6
@@ -660,6 +706,7 @@ show_selection_review() {
         1) sel_count=0; for x in "${COOLER_SELECTED[@]}"; do ((sel_count += x)); done; total=${#COOLER_SELECTED[@]} ;;
         2) sel_count=0; for x in "${ASSET_SELECTED[@]}"; do ((sel_count += x)); done; total=${#ASSET_SELECTED[@]} ;;
         3) sel_count=0; for x in "${DESKTOP_SELECTED[@]}"; do ((sel_count += x)); done; total=${#DESKTOP_SELECTED[@]} ;;
+        4) sel_count=${PACKAGE_SELECTED[UPDATE_INDEX]}; total=1 ;;
       esac
       x=$((3 + hc[i] * (cw + 4)))
       at "${hr[i]}" "$x"
@@ -721,6 +768,7 @@ show_selection_review() {
           1) COOLER_SELECTED[i]=$((1 - COOLER_SELECTED[i])) ;;
           2) ASSET_SELECTED[i]=$((1 - ASSET_SELECTED[i])) ;;
           3) DESKTOP_SELECTED[i]=$((1 - DESKTOP_SELECTED[i])) ;;
+          4) PACKAGE_SELECTED[UPDATE_INDEX]=$((1 - PACKAGE_SELECTED[UPDATE_INDEX])) ;;
         esac
         log_event "Review toggle: ${rl[cursor]}."
         ;;
@@ -731,12 +779,13 @@ show_selection_review() {
           1) if any_selected "${COOLER_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=$x; done ;;
           2) if any_selected "${ASSET_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!ASSET_SELECTED[@]}"; do ASSET_SELECTED[i]=$x; done ;;
           3) if any_selected "${DESKTOP_SELECTED[@]}"; then x=0; else x=1; fi; for i in "${!DESKTOP_SELECTED[@]}"; do DESKTOP_SELECTED[i]=$x; done ;;
+          4) PACKAGE_SELECTED[UPDATE_INDEX]=$((1 - PACKAGE_SELECTED[UPDATE_INDEX])) ;;
         esac
         ;;
       a|A) for i in "${!APP_SELECTED[@]}"; do APP_SELECTED[i]=1; done; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=1; done
-           ASSET_SELECTED=(1 1); DESKTOP_SELECTED=(1) ;;
+           ASSET_SELECTED=(1 1); DESKTOP_SELECTED=(1 1); PACKAGE_SELECTED[UPDATE_INDEX]=1 ;;
       n|N) for i in "${!APP_SELECTED[@]}"; do APP_SELECTED[i]=0; done; for i in "${!COOLER_SELECTED[@]}"; do COOLER_SELECTED[i]=0; done
-           ASSET_SELECTED=(0 0); DESKTOP_SELECTED=(0) ;;
+           ASSET_SELECTED=(0 0); DESKTOP_SELECTED=(0 0); PACKAGE_SELECTED[UPDATE_INDEX]=0 ;;
       ENTER) REVIEW_CURSOR=$cursor; log_event 'Selection review confirmed.'; return 0 ;;
       b|B|BACKSPACE) REVIEW_CURSOR=$cursor; return 2 ;;
       ESC|q|Q) return 1 ;;
@@ -781,7 +830,11 @@ build_plan() {
   local -a list=() notes=()
   PLAN_LINES=() PLAN_BLOCKERS=()
 
-  plan_row ok 'System update' 'pacman -Syu (full system upgrade, runs first)'
+  if (( PACKAGE_SELECTED[UPDATE_INDEX] )); then
+    plan_row ok 'System update' 'pacman -Syu (full system upgrade, runs first)'
+  else
+    plan_row skip 'System update' 'not selected; package installs still sync and upgrade (pacman -Syu --needed)'
+  fi
 
   list=()
   for i in "${!APP_ITEMS[@]}"; do
@@ -827,8 +880,23 @@ build_plan() {
     fi
   fi
 
+  if (( DESKTOP_SELECTED[DANK_INDEX] )); then
+    if (( ADW_GTK_INSTALLED )); then notes=('adw-gtk-theme: installed'); else notes=('adw-gtk-theme: will install'); fi
+    notes+=("Ghostty $G_SEP dms-greeter, dsearch, dcal $G_SEP existing Hyprland config backed up, then replaced")
+    notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
+    plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
+    case "$(uname -m)" in
+      x86_64|aarch64) ;;
+      *) PLAN_BLOCKERS+=("duxinstall supports only x86_64 and aarch64, not $(uname -m). Deselect Dank Shell.") ;;
+    esac
+  fi
+
   if ! any_selected "${APP_SELECTED[@]}" "${COOLER_SELECTED[@]}" "${ASSET_SELECTED[@]}" "${DESKTOP_SELECTED[@]}"; then
-    plan_row skip 'Optional items' 'none selected; only the system update will run'
+    if (( PACKAGE_SELECTED[UPDATE_INDEX] )); then
+      plan_row skip 'Optional items' 'none selected; only the system update will run'
+    else
+      PLAN_BLOCKERS+=('Nothing is selected. Go back and choose at least one item.')
+    fi
   fi
   for problem in "${PLAN_BLOCKERS[@]}"; do plan_row block 'Cannot continue' "$problem"; done
   return 0
@@ -981,6 +1049,7 @@ show_completion() {
   lines+=('')
   if [[ -n "$REBOOT_REASON" ]]; then lines+=("$YELLOW$G_REBOOT $REBOOT_REASON$RESET"); fi
   if [[ "${PHASE_STATE[5]}" == ok ]]; then lines+=("$DIM$G_INFO Log out and back in to see every KDE change.$RESET"); fi
+  if [[ "${PHASE_STATE[6]}" == ok ]]; then lines+=("$DIM$G_INFO Log out and choose the Hyprland session to start Dank Shell.$RESET"); fi
   (( DRY_RUN )) && lines+=("$YELLOW$G_WARN Dry run: nothing was changed.$RESET")
   case "$outcome" in
     ok) title='Finished' ;;
@@ -1058,7 +1127,7 @@ draw_frame_status() { # visible text color
 redraw_frame() {
   local visible=$((TERM_ROWS - 11))
   (( visible < 3 )) && visible=3
-  draw_header "${FRAME_TITLE}" Install "$FRAME_NUM" 6
+  draw_header "${FRAME_TITLE}" Install "$FRAME_NUM" "$PHASE_COUNT"
   draw_frame_box "$visible"
   draw_frame_rows "$visible"
   draw_frame_status "$visible" "$FRAME_STATUS" "$FRAME_STATUS_COLOR"
@@ -1086,8 +1155,8 @@ run_step() {
   (( visible < 3 )) && visible=3
   FRAME_LINES=() FRAME_NUM=$num FRAME_TITLE=$title
   FRAME_STATUS='' FRAME_STATUS_COLOR=$CYAN
-  log_event "Install step $num/6 started: $title."
-  draw_header "$title" Install "$num" 6
+  log_event "Install step $num/$PHASE_COUNT started: $title."
+  draw_header "$title" Install "$num" "$PHASE_COUNT"
   draw_frame_box "$visible"
   draw_footer 'Ctrl+C' 'Stop after this step'
 
@@ -1142,11 +1211,11 @@ run_step() {
   if (( rc == 0 )); then
     PHASE_STATE[num-1]=ok
     FRAME_STATUS="$G_OK ${PHASE_DONE_TEXT[num-1]} (${PHASE_TIME[num-1]})" FRAME_STATUS_COLOR=$GREEN
-    log_event "Install step $num/6 completed: $title (${PHASE_TIME[num-1]})."
+    log_event "Install step $num/$PHASE_COUNT completed: $title (${PHASE_TIME[num-1]})."
   else
     PHASE_STATE[num-1]=fail
     FRAME_STATUS="$G_FAIL $title failed (exit $rc) after ${PHASE_TIME[num-1]}" FRAME_STATUS_COLOR=$RED
-    log_event "ERROR: install step $num/6 failed: $title (exit $rc)."
+    log_event "ERROR: install step $num/$PHASE_COUNT failed: $title (exit $rc)."
   fi
   draw_frame_status "$visible" "$FRAME_STATUS" "$FRAME_STATUS_COLOR"
   return "$rc"
@@ -1186,13 +1255,14 @@ after_step() {
 
 phase_enabled() {
   case "$1" in
-    1) return 0 ;;
+    1) (( PACKAGE_SELECTED[UPDATE_INDEX] )) ;;
     2) any_selected "${APP_SELECTED[@]}" "${COOLER_SELECTED[@]:0:3}" "${DESKTOP_SELECTED[@]}" \
          || { (( COOLER_SELECTED[COOLER_AUR_INDEX] && ! PARU_INSTALLED )); } ;;
     3) (( COOLER_SELECTED[COOLER_AUR_INDEX] )) ;;
     4) (( COOLER_SELECTED[COOLER_DAEMON_INDEX] )) ;;
     5) any_selected "${ASSET_SELECTED[@]}" ;;
     6) (( DESKTOP_SELECTED[0] )) ;;
+    7) (( DESKTOP_SELECTED[DANK_INDEX] )) ;;
   esac
 }
 
@@ -1200,12 +1270,12 @@ run_installation_phases() {
   local num rc stop=0
   disable_interrupt_key
   start_sudo_keepalive
-  for num in 1 2 3 4 5 6; do
+  for ((num = 1; num <= PHASE_COUNT; num++)); do
     if ! phase_enabled "$num"; then PHASE_STATE[num-1]=skip; continue; fi
     if (( stop )); then PHASE_STATE[num-1]=stopped; continue; fi
     rc=0
     run_step "$num" "${PHASE_TITLES[num-1]}" "${PHASE_FUNCS[num-1]}" || rc=$?
-    if (( rc == 0 )) && (( num == 1 || num == 3 )); then check_reboot_needed; fi
+    if (( rc == 0 )) && (( num <= 3 || num == 7 )); then check_reboot_needed; fi
     after_step "$num" "$rc" || stop=1
   done
 }
@@ -1225,11 +1295,7 @@ check_reboot_needed() {
 
 update_system_packages() {
   info 'Updating system packages with pacman -Syu.'
-  if command -v stdbuf >/dev/null 2>&1; then
-    as_root stdbuf -oL -eL pacman -Syu --noconfirm --color never
-  else
-    as_root pacman -Syu --noconfirm --color never
-  fi
+  pacman_root -Syu
 }
 
 install_selected_pacman_packages() {
@@ -1249,12 +1315,22 @@ install_selected_pacman_packages() {
     info 'Including paru from your repositories for the AUR sensor driver.'
   fi
   (( DESKTOP_SELECTED[0] )) && packages+=(oxygen)
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme)
   if ((${#packages[@]} == 0)); then
     info 'No pacman packages selected.'
     return 0
   fi
-  info "Installing: ${packages[*]}"
-  pacman_install "${packages[@]}"
+  split_installed "${packages[@]}"
+  if ((${#MISSING_PACKAGES[@]} == 0)); then
+    success "Already installed: ${packages[*]}"
+    return 0
+  fi
+  ((${#INSTALLED_PACKAGES[@]})) && info "Already installed, skipped: ${INSTALLED_PACKAGES[*]}"
+  if (( ! PACKAGE_SELECTED[UPDATE_INDEX] )); then
+    info 'Syncing and upgrading in the same transaction (pacman -Syu --needed).'
+  fi
+  info "Installing: ${MISSING_PACKAGES[*]}"
+  pacman_install "${MISSING_PACKAGES[@]}"
 }
 
 ensureParu() {
@@ -1289,12 +1365,15 @@ installKernelHeadersForDkms() {
     fi
     header_packages+=("$headers_package")
   done
+  # dkms is the driver's one repository dependency; installing it here keeps
+  # paru from pulling it from unsynced package databases.
+  pacman -Qq dkms >/dev/null 2>&1 || header_packages+=(dkms)
   if [[ "$found_kernel" != yes ]]; then
     error 'Could not determine installed kernel packages under /usr/lib/modules.'
     return 1
   fi
   if ((${#header_packages[@]})); then
-    info "Installing kernel headers for DKMS: ${header_packages[*]}"
+    info "Installing for DKMS: ${header_packages[*]}"
     pacman_install "${header_packages[@]}"
   else
     success 'Matching kernel headers are already installed.'
@@ -1555,6 +1634,32 @@ subprocess.run(["dbus-send", "--session", "--dest=org.kde.plasmashell", "--type=
   success 'KDE Plasma appearance, terminal, input, and wallpaper settings written.'
 }
 
+# duxinstall installs Hyprland, Ghostty and Dank Shell with pacman and makepkg
+# on its own. It needs cached sudo credentials (the keepalive provides them)
+# and never prompts with -y.
+install_dank_shell() {
+  local tmp rc=0
+  need_cmd curl 'curl is required to download duxinstall.' || return 1
+  if (( ! PACKAGE_SELECTED[UPDATE_INDEX] )); then
+    info 'Syncing and upgrading first so duxinstall does not install onto stale package databases.'
+    pacman_root -Syu || return 1
+  fi
+  tmp=$(mktemp "${TMPDIR:-/tmp}/duxinstall.XXXXXXXX") || return 1
+  info "Downloading the duxinstall bootstrap from $DUX_INSTALL_URL"
+  if ! curl -fsSL "$DUX_INSTALL_URL" -o "$tmp" || [[ ! -s "$tmp" ]]; then
+    rm -f -- "$tmp"; error 'Could not download the duxinstall bootstrap.'; return 1
+  fi
+  success "Bootstrap downloaded ($(wc -l < "$tmp") lines); it verifies the installer's checksum before running it."
+  info "Running duxinstall ${DUX_INSTALL_ARGS[*]}"
+  run sh "$tmp" "${DUX_INSTALL_ARGS[@]}" || rc=$?
+  rm -f -- "$tmp"
+  if (( rc )); then
+    error "duxinstall failed (exit $rc). Its own log is /tmp/duxinstall-<timestamp>.log."
+    return "$rc"
+  fi
+  success 'Dank Shell installed. Its own log is /tmp/duxinstall-<timestamp>.log.'
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main flow
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1584,8 +1689,10 @@ apply_preselection() {
   (( PRE_WALLPAPERS )) && ASSET_SELECTED[0]=1
   (( PRE_CURSORS )) && ASSET_SELECTED[1]=1
   (( PRE_KDE )) && DESKTOP_SELECTED[0]=1
+  (( PRE_DANK )) && DESKTOP_SELECTED[DANK_INDEX]=1
+  (( PRE_UPDATE )) && PACKAGE_SELECTED[UPDATE_INDEX]=1
   sync_groups_from_items
-  log_event "Preselected from options: apps=$PRE_APPS cooling=$PRE_COOLING wallpapers=$PRE_WALLPAPERS cursors=$PRE_CURSORS kde=$PRE_KDE"
+  log_event "Preselected from options: apps=$PRE_APPS cooling=$PRE_COOLING wallpapers=$PRE_WALLPAPERS cursors=$PRE_CURSORS kde=$PRE_KDE dankshell=$PRE_DANK update=$PRE_UPDATE"
 }
 
 main() {
@@ -1608,7 +1715,7 @@ main() {
       1)
         sync_groups_from_items
         result=0
-        draw_menu 1 'Optional package groups' 'Choose package groups. You can fine-tune single packages on the review screen.' \
+        draw_menu 1 'Packages and updates' 'Choose package groups and the system update. Fine-tune them on review.' \
           PACKAGE_LABELS PACKAGE_DETAILS PACKAGE_SELECTED || result=$?
         (( result == 1 )) && return 0
         (( result == 2 )) && { stage=0; continue; }
@@ -1625,7 +1732,7 @@ main() {
         ;;
       3)
         result=0
-        draw_menu 3 'Desktop themes' 'Choose an optional desktop configuration.' \
+        draw_menu 3 'Desktop themes' 'Choose optional desktop setups. Both can be installed side by side.' \
           DESKTOP_LABELS DESKTOP_DETAILS DESKTOP_SELECTED || result=$?
         (( result == 1 )) && return 0
         (( result == 2 )) && { stage=2; continue; }
