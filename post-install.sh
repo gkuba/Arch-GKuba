@@ -205,7 +205,7 @@ PARU_AVAILABLE=0
 PACKAGE_STATUS_READY=0
 
 PHASE_TITLES=( 'System update' 'Pacman packages' 'AUR packages' 'CoolerControl profile' 'Desktop assets' 'KDE Plasma configuration' 'Dank Shell' 'Dank Shell appearance' )
-PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_aurapplyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig install_dank_shell apply_dank_shell_appearance )
+PHASE_FUNCS=( update_system_packages install_selected_pacman_packages install_selected_aur applyCoolerControlConfig install_selected_desktop_assets applyKdePlasmaConfig install_dank_shell apply_dank_shell_appearance )
 PHASE_DONE_TEXT=( 'System packages are up to date.' 'Selected pacman packages installed.' 'AUR packages installed.' 'CoolerControl profile applied and daemon enabled.' 'Desktop assets copied.' 'KDE Plasma configuration applied.' 'Dank Shell installed on Hyprland.' 'Violet-Noir theme, cursor, wallpapers and login screen applied.' )
 PHASE_FATAL=( 1 1 0 0 0 0 0 0 )
 PHASE_STATE=( pending pending pending pending pending pending pending pending )
