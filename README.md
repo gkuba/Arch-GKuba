@@ -225,6 +225,8 @@ first, and running it again changes nothing that is already current:
 - runs `dms-greeter sync --yes` so the login screen uses the same theme and
   each monitor's current wallpaper, then lets the greeter group read
   `~/Pictures/Wallpapers` with ACLs, which the sync does not cover;
+- copies the Empty-Butterfly-Purple cursor to `/usr/local/share/icons`, since
+  the login screen only uses a cursor theme installed system-wide;
 - preselects the plain Hyprland session (not Hyprland with uwsm) on the login
   screen, unless another session was chosen there since. The sync's auto-login
   warning about `memory.json` on the first run is harmless: the group change

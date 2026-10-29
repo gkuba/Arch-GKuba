@@ -1864,6 +1864,16 @@ apply_dank_shell_appearance() {
     warn 'dms-greeter is not installed; the login screen was not synced.'
     return 0
   fi
+  # The greeter applies the cursor from the synced settings.json only when
+  # the theme is installed system-wide; it cannot read ~/.icons.
+  if [[ -d "$scratch/DESetupLinux/.icons/$cursor/cursors" ]]; then
+    as_root rm -rf -- "/usr/local/share/icons/$cursor" || rc=1
+    as_root install -d -m 0755 /usr/local/share/icons || rc=1
+    as_root cp -R --no-preserve=mode,ownership -- "$scratch/DESetupLinux/.icons/$cursor" /usr/local/share/icons/ || rc=1
+    (( rc )) || success "Installed the $cursor cursor in /usr/local/share/icons for the login screen."
+  else
+    warn "DESetupLinux has no $cursor cursor theme; the login screen keeps its default cursor."
+  fi
   info 'Syncing the login screen with dms-greeter.'
   run dms-greeter sync --yes || rc=$?
   for group in greeter greetd _greeter; do getent group "$group" >/dev/null 2>&1 && break; group=''; done
