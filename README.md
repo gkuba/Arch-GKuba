@@ -53,7 +53,7 @@ Installation then runs step by step, with live output in a frame:
 | --- | --- |
 | System update (`pacman -Syu`) | The system update is selected |
 | Pacman packages | Any package, KDE configuration or Dank Shell is selected |
-| AUR packages | The MSI sensor driver is selected |
+| AUR packages | The MSI sensor driver or Dank Shell is selected (Dank Shell needs `qtengine`) |
 | CoolerControl profile | The CoolerControl daemon is selected |
 | Desktop assets | Wallpapers or cursor themes are selected |
 | KDE Plasma configuration | KDE Plasma configuration is selected |
@@ -191,8 +191,11 @@ curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-f
 
 - installs Hyprland, Ghostty, Dank Shell (dms), quickshell and its other
   dependencies, plus the optional dms-greeter, dsearch and dcal
-  (`--all-features`); `adw-gtk-theme` and `kconfig` are installed in the pacman
-  step;
+  (`--all-features`); `adw-gtk-theme` (GTK theming) and `breeze` (the Qt
+  style) are installed in the pacman step, and `qtengine` (Qt theming, from
+  the AUR with `paru`) in the AUR step, as Dank Shell's
+  [application themes docs](https://duxlabs.dev/docs/dms/application-themes)
+  require;
 - replaces only the Hyprland config, after backing up the existing one; an
   existing Ghostty config is kept;
 - uses the sudo session this script already holds (`--privesc sudo`), so it
@@ -221,18 +224,23 @@ first, and running it again changes nothing that is already current:
 - installs `~/.config/hypr/violet-noir.lua` (gradient border, glassy windows
   at 90% focused and 82% unfocused, xray blur so windows blur the wallpaper
   rather than the windows beneath), which overrides Dank Shell's Window
-  opacity slider, and `~/.config/hypr/discord-ptt.lua`, which passes the side
-  mouse buttons (Mouse4, Mouse5) to Discord so push-to-talk works whichever
-  window is focused; both load at the end of `hyprland.lua`, after the Dank
+  opacity slider, and `~/.config/hypr/discord-ptt.lua`, which makes the forward
+  mouse button hold F14 in Discord so push-to-talk works whichever window is
+  focused (record it in Discord by pressing the button); both load at the end of `hyprland.lua`, after the Dank
   Shell fragments;
 - turns on Dank Shell's Xray blur for its bar and popups by adding its rule
   to `~/.config/hypr/dms/layout.lua`, where Dank Shell keeps that toggle;
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
   in random order every hour (monitor names come from `/sys/class/drm`);
-- sets Dolphin's window color scheme to Dank Shell's `DankMatugen` in
-  `~/.config/dolphinrc`; Dank Shell regenerates that scheme from the active
-  theme, so Dolphin follows Violet-Noir (and any later theme change);
+- themes Qt apps, Dolphin among them, with Dank Shell's colors through
+  qtengine: `violet-noir.lua` sets `QT_QPA_PLATFORMTHEME` (and `_QT6`) to
+  `qtengine` in place of the gtk3 passthrough, and the step points
+  `~/.config/qtengine/config.json` at Dank Shell's `DankMatugen.colors`
+  (starting from qtengine's example config, other keys kept). Dank Shell
+  rewrites that scheme and the config on every theme change. The AUR
+  package's Qt5 plugin is linked into `/usr/lib/qt/plugins`, where Arch's Qt5
+  looks; `dms doctor` checks both;
 - runs `dms-greeter sync --yes` so the login screen uses the same theme and
   each monitor's current wallpaper, then lets the greeter group read
   `~/Pictures/Wallpapers` with ACLs, which the sync does not cover;
