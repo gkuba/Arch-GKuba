@@ -191,7 +191,8 @@ curl -fsSL https://install.duxlabs.dev | sh -s -- -c hyprland -t ghostty --all-f
 
 - installs Hyprland, Ghostty, Dank Shell (dms), quickshell and its other
   dependencies, plus the optional dms-greeter, dsearch and dcal
-  (`--all-features`); `adw-gtk-theme` is installed in the pacman step;
+  (`--all-features`); `adw-gtk-theme` and `breeze` are installed in the pacman
+  step;
 - replaces only the Hyprland config, after backing up the existing one; an
   existing Ghostty config is kept;
 - uses the sudo session this script already holds (`--privesc sudo`), so it
@@ -211,17 +212,21 @@ first, and running it again changes nothing that is already current:
 
 - installs the Violet-Noir custom theme to `~/.config/dms/themes/` and selects
   it in `~/.config/dms/settings.json`, together with the
-  Empty-Butterfly-Purple cursor at 48px (`cursorSettings`) and the Fit
+  Empty-Butterfly-Purple cursor at 32px (`cursorSettings`), 88% window
+  opacity (`hyprlandWindowOpacity`, the Window opacity slider) and the Fit
   wallpaper mode for the desktop and login screen, keeping every other
   setting;
 - writes the cursor to `~/.config/hypr/dms/cursor.lua` and `~/.Xresources`
   with the same content Dank Shell writes, because Dank Shell only writes them
   when the cursor is changed in its Settings;
-- installs `~/.config/hypr/violet-noir.lua` (gradient border, opacity, blur)
+- installs `~/.config/hypr/violet-noir.lua` (gradient border, and xray blur
+  so windows blur the wallpaper rather than the windows beneath)
   and loads it at the end of `hyprland.lua`, after the Dank Shell fragments;
 - in `~/.local/state/dms/session.json`, gives each connected monitor a random
   wallpaper from `~/Pictures/Wallpapers`, shown with Fit, and rotates each one
   in random order every hour (monitor names come from `/sys/class/drm`);
+- sets Dolphin to Breeze Dark in `~/.config/dolphinrc`, since KDE apps
+  outside Plasma ignore the system color scheme;
 - runs `dms-greeter sync --yes` so the login screen uses the same theme and
   each monitor's current wallpaper, then lets the greeter group read
   `~/Pictures/Wallpapers` with ACLs, which the sync does not cover;

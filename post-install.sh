@@ -918,7 +918,7 @@ build_plan() {
     if (( ADW_GTK_INSTALLED )); then notes=('adw-gtk-theme: installed'); else notes=('adw-gtk-theme: will install'); fi
     notes+=("Ghostty $G_SEP dms-greeter, dsearch, dcal $G_SEP existing Hyprland config backed up, then replaced")
     notes+=("runs: curl -fsSL $DUX_INSTALL_URL | sh -s -- ${DUX_INSTALL_ARGS[*]}")
-    notes+=("then Violet-Noir theme $G_SEP gradient borders, blur $G_SEP Empty-Butterfly-Purple cursor 48px")
+    notes+=("then Violet-Noir theme $G_SEP gradient borders $G_SEP 88% windows, blurred wallpaper behind $G_SEP Empty-Butterfly-Purple cursor 32px $G_SEP Dolphin in Breeze Dark")
     notes+=("random wallpaper per monitor, rotating hourly $G_SEP login screen synced with dms-greeter")
     plan_row ok 'Dank Shell' 'Hyprland session with Dank Shell, installed headless by duxinstall' "${notes[@]}"
     case "$(uname -m)" in
@@ -1351,7 +1351,7 @@ install_selected_pacman_packages() {
     info 'Including paru from your repositories for the AUR sensor driver.'
   fi
   (( DESKTOP_SELECTED[0] )) && packages+=(oxygen)
-  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme jq)
+  (( DESKTOP_SELECTED[DANK_INDEX] )) && packages+=(adw-gtk-theme breeze jq)
   if ((${#packages[@]} == 0)); then
     info 'No pacman packages selected.'
     return 0
@@ -1744,8 +1744,8 @@ connected_monitors() { # -> MONITORS (DRM connector names, as Hyprland names out
 # Dank Shell reads its theme, cursor and wallpaper settings from settings.json
 # and session.json; dms-greeter sync links both into the login screen.
 apply_dank_shell_appearance() {
-  local scratch src backup_dir hypr_main settings session theme wall_dir new group rc=0 i pick
-  local cursor=Empty-Butterfly-Purple cursor_size=48
+  local scratch src backup_dir hypr_main settings session theme wall_dir new group rc=0 step_rc i pick
+  local cursor=Empty-Butterfly-Purple cursor_size=32 window_opacity=88
   local require_line='require("violet-noir")'
   local -a images=() pairs=() used=()
   need_cmd git 'git is required to download DESetupLinux.' || return 1
@@ -1791,8 +1791,10 @@ apply_dank_shell_appearance() {
       .currentThemeName = "custom"
       | .customThemeFile = $theme
       | .cursorSettings = ((.cursorSettings // {}) + {theme: $cursor, size: ($size | tonumber)})
+      | .hyprlandWindowOpacity = ($opacity | tonumber)
       | .wallpaperFillMode = "Fit"
-      | .lockScreenWallpaperFillMode = "Fit"' --arg cursor "$cursor" --arg size "$cursor_size" > "$new"; then
+      | .lockScreenWallpaperFillMode = "Fit"' --arg cursor "$cursor" --arg size "$cursor_size" \
+        --arg opacity "$window_opacity" > "$new"; then
     rm -rf -- "$scratch"; error 'Could not build the Dank Shell settings.'; return 1
   fi
   install_generated "$settings" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
@@ -1856,6 +1858,20 @@ apply_dank_shell_appearance() {
   fi
   install_generated "$session" "$new" "$backup_dir" || { rm -rf -- "$scratch"; return 1; }
 
+  # Outside Plasma, KDE apps ignore the kdeglobals color scheme; Dolphin keeps
+  # its own in dolphinrc. BreezeDark.colors comes from the breeze package.
+  if command -v kwriteconfig6 >/dev/null 2>&1; then
+    if run kwriteconfig6 --file dolphinrc --group UiSettings --key ColorScheme BreezeDark; then
+      success 'Set Dolphin to Breeze Dark.'
+    else
+      rc=1
+    fi
+  elif (( DRY_RUN )); then
+    dry_note 'kwriteconfig6 is not installed yet; a real run sets Dolphin to Breeze Dark here.'
+  else
+    warn 'kwriteconfig6 is not installed; Dolphin keeps its default colors.'
+  fi
+
   # Login screen: link the settings into the greeter, then let the greeter
   # read the wallpapers, which dms-greeter sync does not cover.
   if ! command -v dms-greeter >/dev/null 2>&1; then
@@ -1867,10 +1883,13 @@ apply_dank_shell_appearance() {
   # The greeter applies the cursor from the synced settings.json only when
   # the theme is installed system-wide; it cannot read ~/.icons.
   if [[ -d "$scratch/DESetupLinux/.icons/$cursor/cursors" ]]; then
-    as_root rm -rf -- "/usr/local/share/icons/$cursor" || rc=1
-    as_root install -d -m 0755 /usr/local/share/icons || rc=1
-    as_root cp -R --no-preserve=mode,ownership -- "$scratch/DESetupLinux/.icons/$cursor" /usr/local/share/icons/ || rc=1
-    (( rc )) || success "Installed the $cursor cursor in /usr/local/share/icons for the login screen."
+    step_rc=0
+    as_root rm -rf -- "/usr/local/share/icons/$cursor" || step_rc=1
+    as_root install -d -m 0755 /usr/local/share/icons || step_rc=1
+    as_root cp -R --no-preserve=mode,ownership -- "$scratch/DESetupLinux/.icons/$cursor" /usr/local/share/icons/ || step_rc=1
+    if (( step_rc )); then rc=1
+    else success "Installed the $cursor cursor in /usr/local/share/icons for the login screen."
+    fi
   else
     warn "DESetupLinux has no $cursor cursor theme; the login screen keeps its default cursor."
   fi
@@ -1880,10 +1899,13 @@ apply_dank_shell_appearance() {
   if [[ -z "$group" ]]; then
     warn 'No greeter group found; the login screen may not be able to read ~/Pictures/Wallpapers.'
   elif command -v setfacl >/dev/null 2>&1; then
-    run setfacl -m "g:$group:x" "$HOME" "$HOME/Pictures" || rc=1
-    run setfacl -R -m "g:$group:rX" "$wall_dir" || rc=1
-    run setfacl -d -m "g:$group:rX" "$wall_dir" || rc=1
-    (( rc )) || success "The $group group can read ~/Pictures/Wallpapers for the login screen."
+    step_rc=0
+    run setfacl -m "g:$group:x" "$HOME" "$HOME/Pictures" || step_rc=1
+    run setfacl -R -m "g:$group:rX" "$wall_dir" || step_rc=1
+    run setfacl -d -m "g:$group:rX" "$wall_dir" || step_rc=1
+    if (( step_rc )); then rc=1
+    else success "The $group group can read ~/Pictures/Wallpapers for the login screen."
+    fi
   else
     warn 'setfacl is not installed; the login screen may not be able to read ~/Pictures/Wallpapers.'
   fi
